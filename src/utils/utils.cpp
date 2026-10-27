@@ -199,119 +199,105 @@ void DumpNoErrors(const std::filesystem::path &filename)
     file.close();
 }
 
+namespace
+{
+/// Appends "0x" and 16 zero-padded hex digits (the dump's register format).
+void appendHex16(std::string &out, uint64_t value)
+{
+    static const char kDigits[] = "0123456789abcdef";
+    char text[18] = {'0', 'x'};
+    for (int i = 17; i >= 2; --i)
+    {
+        text[i] = kDigits[value & 0xF];
+        value >>= 4;
+    }
+    out.append(text, sizeof(text));
+}
+
+/// Appends one register section: "    \"name\": {\n" entries "    },\n".
+template <typename Values>
+void appendRegisterSection(std::string &out, const char *name, char prefix, const Values &values)
+{
+    out += "    \"";
+    out += name;
+    out += "\": {\n";
+    for (size_t i = 0; i < values.size(); ++i)
+    {
+        out += "        \"";
+        out += prefix;
+        out += std::to_string(i);
+        out += i >= 10 ? "\": \"" : "\" : \"";
+        appendHex16(out, values[i]);
+        out += i + 1 != values.size() ? "\",\n" : "\"\n";
+    }
+    out += "    },\n";
+}
+} // namespace
+
 void DumpRegisters(const std::filesystem::path &filename, RegisterFile &register_file)
 {
-
+    // This dump is written after every step, so it is formatted directly into one string
+    // (stream manipulators per value were a measurable part of the time per step).
     std::vector<uint64_t> gp_registers = register_file.GetGprValues();
     std::vector<uint64_t> fp_registers = register_file.GetFprValues();
 
-    std::ofstream file(filename);
-    if (!file.is_open())
+    std::ofstream out(filename);
+    if (!out.is_open())
     {
         throw std::runtime_error("Unable to open file: " + filename.string());
     }
+    std::string file;
+    file.reserve(4096);
 
-    file << "{\n";
-
-    file << "    \"control and status registers\": {\n";
-    if (!csr_to_address.empty())
+    file += "{\n";
+    file += "    \"control and status registers\": {\n";
+    for (auto it = csr_to_address.begin(); it != csr_to_address.end();)
     {
-        auto it = csr_to_address.begin();
-        auto end = csr_to_address.end();
-
-        while (true)
-        {
-            const auto &key = it->first;
-            const auto &value = it->second;
-
-            file << "        \"" << key << "\": \"0x" << std::hex << std::setw(16)
-                 << std::setfill('0') << register_file.ReadCsr(value) << std::setw(0)
-                 << std::setfill(' ') << std::dec << "\"";
-
-            ++it;
-            if (it != end)
-            {
-                file << ",";
-            }
-            file << "\n";
-
-            if (it == end)
-                break;
-        }
+        file += "        \"";
+        file += it->first;
+        file += "\": \"";
+        appendHex16(file, register_file.ReadCsr(it->second));
+        ++it;
+        file += it != csr_to_address.end() ? "\",\n" : "\"\n";
     }
-    file << "    },\n";
+    file += "    },\n";
 
-    file << "    \"gp_registers\": {\n";
-    for (size_t i = 0; i < gp_registers.size(); ++i)
-    {
-        file << "        \"x" << i << "\"";
-        file << std::string((i >= 10 ? 0 : 1), ' ');
-        file << ": \"0x";
-        file << std::hex << std::setw(16) << std::setfill('0') << gp_registers[i] << std::setw(0)
-             << std::setfill(' ') << std::dec << "\"";
-        if (i != gp_registers.size() - 1)
-        {
-            file << ",";
-        }
-        file << "\n";
-    }
-    file << "    },\n";
-
-    file << "    \"fp_registers\": {\n";
-    for (size_t i = 0; i < fp_registers.size(); ++i)
-    {
-        file << "        \"f" << i << "\"";
-        file << std::string((i >= 10 ? 0 : 1), ' ');
-        file << ": \"0x";
-        file << std::hex << std::setw(16) << std::setfill('0') << fp_registers[i] << std::setw(0)
-             << std::setfill(' ') << std::dec << "\"";
-
-        if (i != fp_registers.size() - 1)
-        {
-            file << ",";
-        }
-        file << "\n";
-    }
-    file << "    },\n";
+    appendRegisterSection(file, "gp_registers", 'x', gp_registers);
+    appendRegisterSection(file, "fp_registers", 'f', fp_registers);
 
     // Vector registers as hex strings, most significant byte first, so element 0 is in the
     // rightmost (least significant) digits.
+    // This dump is written after every step. Leading zeros are omitted so that unused
+    // registers cost a few bytes and scalar programs keep a small file (writing a file larger
+    // than 4 KiB after every step measurably slowed down scalar runs).
     const std::vector<uint8_t> &vector_bytes = register_file.GetVrBytes();
     const size_t vlenb = register_file.GetVlenb();
-    file << "    \"vector_registers\": {\n";
+    static const char kHexDigits[] = "0123456789abcdef";
+    std::string section = "    \"vector_registers\": {\n";
+    section.reserve(section.size() + 32 * (2 * vlenb + 24));
     for (size_t reg = 0; reg < 32 && vlenb > 0; ++reg)
     {
-        file << "        \"v" << reg << "\"" << std::string((reg >= 10 ? 0 : 1), ' ') << ": \"0x";
+        section += "        \"v" + std::to_string(reg) + "\"" + (reg >= 10 ? "" : " ") + ": \"0x";
+        bool leading = true;
         for (size_t b = vlenb; b-- > 0;)
         {
-            file << std::hex << std::setw(2) << std::setfill('0')
-                 << static_cast<unsigned>(vector_bytes[reg * vlenb + b]);
+            const uint8_t byte = vector_bytes[reg * vlenb + b];
+            for (unsigned digit : {static_cast<unsigned>(byte >> 4), static_cast<unsigned>(byte & 0xF)})
+            {
+                if (leading && digit == 0)
+                    continue;
+                leading = false;
+                section += kHexDigits[digit];
+            }
         }
-        file << std::setw(0) << std::setfill(' ') << std::dec << "\"";
-        if (reg != 31)
-        {
-            file << ",";
-        }
-        file << "\n";
+        if (leading)
+            section += '0';
+        section += reg != 31 ? "\",\n" : "\"\n";
     }
-    file << "    }\n";
-    // file << "    },\n";
-
-    // file << "    \"vec_registers\": {\n";
-    // for (size_t i = 0; i < gp_registers.size(); ++i) {
-    //     file << "        \"x" << i << "\": \"0x"
-    //          << std::hex << std::setw(16) << std::setfill('0') << gp_registers[i] << std::setw(0)
-    //          << std::dec << "\"";
-    //     if (i != gp_registers.size() - 1) {
-    //         file << ",";
-    //     }
-    //     file << "\n";
-    // }
-    // file << "    }\n";
-
-    file << "}\n";
-
-    file.close();
+    section += "    }\n";
+    file += section;
+    file += "}\n";
+    out << file;
 }
 
 // void DumpDisasssembly(const std::filesystem::path &filename, const AssembledProgram &program) {
