@@ -1,7 +1,13 @@
 # KITES : RISC - V SIMULATOR
 
-Kites a is RISC V simulator and assembly code editor built for RISC V ISA.
-Kites support I,M,D and F extenstion in single cyle mod and I,M extension in 5 Stage pipelining mode.(D,F will be added in future releases).
+Kites is a RISC-V simulator and assembly code editor for the RV64 ISA.
+
+| Extension | Single-cycle | 5-stage pipelines |
+|-----------|--------------|-------------------|
+| I, M, F, D | yes | yes |
+| V (vectors, RVV 1.0) | yes | no |
+
+See [docs/VECTOR.md](docs/VECTOR.md) for the vector extension.
 
 ## Downloading and Installation
 
@@ -36,7 +42,7 @@ cmake -DCMAKE_PREFIX_PATH="path/to/Qt/6.x.x/<compiler>" ..
 
 ## Testing
 
-See [docs/TESTING.md](TESTING) for how to build and run tests, including coverage reports.
+See [docs/TESTING.md](docs/TESTING.md) for how to build and run tests, including coverage reports.
 
 ## CLI
 

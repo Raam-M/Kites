@@ -60,6 +60,43 @@ Set via `-D<OPTION>=ON|OFF` at configure time, or in `CMakePresets.json`:
 | `VM_DEBUG_PRINTS`     | `OFF`   | Enable debug prints in the VM during tests        |
 | `ENABLE_COVERAGE`     | `OFF`   | Build the `kites_test_cov` target and `coverage` target |
 
+## Vector extension tests
+
+The vector tests are in `test/vector/` and run as part of `kites_test`. To run
+only them:
+
+```sh
+cd test
+../build/<preset>/test/kites_test --gtest_filter='Vec*'
+```
+
+| File | Checks |
+|------|--------|
+| `vector_assembler_test.cpp` | Every vector mnemonic and pseudo-instruction encodes exactly as LLVM `llvm-mc` encodes it; disassembly round trip; syntax and range errors |
+| `vector_config_test.cpp` | `vset{i}vl{i}`, `vill`, reset state, vector CSRs |
+| `vector_integer_test.cpp` | Integer and fixed-point arithmetic for every legal SEW/LMUL, masked and unmasked, against an independent reference model (`vector_reference.h`) |
+| `vector_permute_test.cpp` | Reductions, mask instructions, slides, gathers, compress, moves |
+| `vector_memory_test.cpp` | Unit-stride, strided, indexed, segment, mask, whole-register and fault-only-first accesses |
+| `vector_float_test.cpp` | Floating-point arithmetic, compares, conversions, estimates, flags |
+| `vector_legality_test.cpp` | Illegal usage is rejected with state unchanged; undo/redo; pipeline guard |
+| `vector_examples_test.cpp` | The programs in `examples/vector/` |
+
+Test names start with the requirement ID they verify (for example
+`VM01_indexed` checks requirement VM-01 of the scope document).
+
+### Regenerating generated files
+
+The encoding table and the golden encodings are generated from
+[riscv-opcodes](https://github.com/riscv/riscv-opcodes) (`extensions/rv_v`) and
+LLVM:
+
+```sh
+python3 -I tools/vector/gen_vector_isa.py <riscv-opcodes>/extensions/rv_v \
+    src/processor/vector/vector_isa_table.inc <riscv-opcodes commit>
+python3 -I tools/vector/gen_golden_encodings.py <riscv-opcodes>/extensions/rv_v \
+    "$(brew --prefix llvm)/bin/llvm-mc" test/vector/golden/encodings.txt
+```
+
 ## Notes
 
 - Coverage instrumentation (`--coverage`) requires GCC or Clang; configuring with `ENABLE_COVERAGE=ON` on another compiler will fail with a clear error.

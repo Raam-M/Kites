@@ -40,14 +40,15 @@ kites-cli <assembly-file> [--vm <name>] [--mem-dump <hex_addr> <row_count>]...
 
 | Name        | `ProcessorType`         | Description                                   |
 |-------------|-------------------------|------------------------------------------------|
-| `rvss`      | `RVSS`                  | Single-cycle (default). Supports I, M, D, F.  |
+| `rvss`      | `RVSS`                  | Single-cycle (default). Supports I, M, F, D, V. |
 | `rv5-nh-nf` | `RV5Stage_NH_NF`        | 5-stage pipeline, no hazard detection, no forwarding. |
 | `rv5-h-nf`  | `RV5Stage_H_NF`         | 5-stage pipeline, hazard detection, no forwarding. |
 | `rv5-nh-f`  | `RV5Stage_NH_F`         | 5-stage pipeline, no hazard detection, forwarding. |
 | `rv5-h-f`   | `RV5Stage_H_F`          | 5-stage pipeline, hazard detection, forwarding. |
 
-The pipelined VMs currently support the I and M extensions only (D/F
-pipelined support is planned).
+The pipelined VMs support the I, M, F and D extensions. Vector (V) instructions
+run only on `rvss`; a pipelined VM stops with an error when it reaches one (see
+[VECTOR.md](VECTOR.md)).
 
 ## Example
 
@@ -117,7 +118,7 @@ depends on platform:
 |-------------------------|---------------------------------|----------------------------------------------------------------|
 | `disassembly.txt`       | Always, on successful assembly  | Human-readable disassembly with address labels and raw hex words. |
 | `errors_dump.json`      | Always                          | `{"errorCode": 0, "errors": []}` on success, or a list of `{line, message}` objects on assembly failure. |
-| `registers_dump.json`   | Always, after the run           | CSRs, all 32 GPRs (`x0`-`x31`), and all 32 FPRs (`f0`-`f31`), each as a hex string. |
+| `registers_dump.json`   | Always, after the run           | CSRs (including the vector CSRs), all 32 GPRs (`x0`-`x31`), all 32 FPRs (`f0`-`f31`) and all 32 vector registers (`v0`-`v31`), each as a hex string. |
 | `memory_dump.json`      | Only if `--mem-dump` was passed | One entry per 8-byte word in the requested address ranges, keyed by hex address, e.g. `"0x0000000000000000": "0x002a000000000000"`. |
 
 ### `registers_dump.json` shape
@@ -135,9 +136,16 @@ depends on platform:
     "fp_registers": {
         "f0" : "0x0000000000000000",
         ...
+    },
+    "vector_registers": {
+        "v0" : "0x00000000000000000000000000000000",
+        ...
     }
 }
 ```
+
+Each vector register is printed as one VLEN-bit (128-bit) hex number, most
+significant byte first, so element 0 is in the rightmost digits.
 
 ## Exit codes
 
