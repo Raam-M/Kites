@@ -5,9 +5,13 @@ Kites is a RISC-V simulator and assembly code editor for the RV64 ISA.
 | Extension | Single-cycle | 5-stage pipelines |
 |-----------|--------------|-------------------|
 | I, M, F, D | yes | yes |
-| V (vectors, RVV 1.0) | yes | no |
+| Zicsr (CSR instructions) | yes | yes |
+| V (vectors, RVV 1.0), Zve64*/Zve32* | yes | yes |
+| Zvfh, Zvbb, Zvkb, Zvbc | yes | yes |
 
-See [docs/VECTOR.md](docs/VECTOR.md) for the vector extension.
+See [docs/VECTOR.md](docs/VECTOR.md) for the vector extension, and
+[docs/vector_extension/](docs/vector_extension) for its scope, design and
+validation documents.
 
 ## Downloading and Installation
 

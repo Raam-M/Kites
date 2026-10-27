@@ -78,24 +78,75 @@ cd test
 | `vector_permute_test.cpp` | Reductions, mask instructions, slides, gathers, compress, moves |
 | `vector_memory_test.cpp` | Unit-stride, strided, indexed, segment, mask, whole-register and fault-only-first accesses |
 | `vector_float_test.cpp` | Floating-point arithmetic, compares, conversions, estimates, flags |
-| `vector_legality_test.cpp` | Illegal usage is rejected with state unchanged; undo/redo; pipeline guard |
+| `vector_half_test.cpp` | Half precision (Zvfh) in every rounding mode against the hardware's `_Float16`; element formatting |
+| `vector_extensions_test.cpp` | Zvbb/Zvkb, Zvbc, Zve* profiles, option parsing, VLEN 128–1024, the all-ones agnostic fill |
+| `vector_legality_test.cpp` | Illegal usage is rejected with state unchanged; undo/redo |
+| `vector_pipeline_test.cpp` | Vector and CSR instructions on the four 5-stage models: results equal the single-cycle model, stalls, NOP rule, memory order, flushes, errors in WB, undo/redo |
+| `vector_profiler_test.cpp` | Statistics and the timing model (hand-computed schedules) |
+| `vector_custom_pseudo_test.cpp` | Vector instructions in custom pseudo-instructions |
 | `vector_examples_test.cpp` | The programs in `examples/vector/` |
+| `../rv5s_regression_test.cpp` | Scalar pipeline fixes found while running vector code (AUIPC/LUI, FP forwarding, draining) |
 
 Test names start with the requirement ID they verify (for example
 `VM01_indexed` checks requirement VM-01 of the scope document).
 
+### Differential testing against Spike
+
+`tools/vector/spike_diff.py` runs the same program on Kites (through `kites-cli`)
+and on [Spike](https://github.com/riscv-software-src/riscv-isa-sim), then compares
+data memory, vector registers, vector CSRs, `fflags` and the scalar registers
+the program uses. It needs `spike`, `llvm-mc` and `ld.lld`
+(`brew install riscv-isa-sim llvm lld`).
+
+```sh
+# the example programs
+python3 -I tools/vector/spike_diff.py --kites build/<preset>/kites-cli examples examples/vector/*.s
+# seeded random programs; --bisect reports the first diverging line of a failure
+python3 -I tools/vector/spike_diff.py --kites build/<preset>/kites-cli random --count 300 --seed 1
+# another processor model, VLEN and set of extensions
+python3 -I tools/vector/spike_diff.py --kites build/<preset>/kites-cli --vm rv5-h-f \
+    --vlen 512 --vector-ext v,zvfh,zvbb,zvbc random --count 100
+```
+
+`--keep DIR` saves failing programs. The models without hazard detection
+(`rv5-nh-*`) need NOPs that random programs do not contain, so use the
+single-cycle model or `rv5-h-nf`/`rv5-h-f` for random programs.
+
+### Coverage with Apple Clang
+
+The `coverage` target links GCC's `libgcov`, which Apple Clang does not have.
+Use clang's source-based coverage instead:
+
+```sh
+cmake -S . -B build/cov -G Ninja -DENABLE_TESTS=ON -DDISABLE_GUI=ON \
+    -DCMAKE_PREFIX_PATH="$(brew --prefix qt)" \
+    -DCMAKE_CXX_FLAGS="-fprofile-instr-generate -fcoverage-mapping" \
+    -DCMAKE_C_FLAGS="-fprofile-instr-generate -fcoverage-mapping" \
+    -DCMAKE_EXE_LINKER_FLAGS="-fprofile-instr-generate"
+cmake --build build/cov --target kites_test
+(cd build/cov && LLVM_PROFILE_FILE="$PWD/prof/%p.profraw" ctest)
+xcrun llvm-profdata merge -sparse build/cov/prof/*.profraw -o build/cov/kites.profdata
+xcrun llvm-cov report build/cov/test/kites_test -instr-profile=build/cov/kites.profdata \
+    src/processor/vector src/assembler/parse_formats/v_formats.cpp
+```
+
 ### Regenerating generated files
 
 The encoding table and the golden encodings are generated from
-[riscv-opcodes](https://github.com/riscv/riscv-opcodes) (`extensions/rv_v`) and
-LLVM:
+[riscv-opcodes](https://github.com/riscv/riscv-opcodes) (`extensions/rv_v`,
+`rv_zvbb`, `rv_zvbc`) and LLVM:
 
 ```sh
-python3 -I tools/vector/gen_vector_isa.py <riscv-opcodes>/extensions/rv_v \
-    src/processor/vector/vector_isa_table.inc <riscv-opcodes commit>
-python3 -I tools/vector/gen_golden_encodings.py <riscv-opcodes>/extensions/rv_v \
-    "$(brew --prefix llvm)/bin/llvm-mc" test/vector/golden/encodings.txt
+python3 -I tools/vector/gen_vector_isa.py src/processor/vector/vector_isa_table.inc \
+    <riscv-opcodes commit> <riscv-opcodes>/extensions/rv_v \
+    <riscv-opcodes>/extensions/rv_zvbb <riscv-opcodes>/extensions/rv_zvbc
+python3 -I tools/vector/gen_golden_encodings.py "$(brew --prefix llvm)/bin/llvm-mc" \
+    test/vector/golden/encodings.txt <riscv-opcodes>/extensions/rv_v \
+    <riscv-opcodes>/extensions/rv_zvbb <riscv-opcodes>/extensions/rv_zvbc
 ```
+
+The vector unit blocks in the circuit designs are added by
+`tools/vector/add_vector_unit_to_circuits.py resources/circuit_designs`.
 
 ## Notes
 

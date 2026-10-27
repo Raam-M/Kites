@@ -1,0 +1,29 @@
+% Generated from the measurement described below; included by validation_report.tex.
+Requirement NF-01 asks that scalar programs run no more than 5\,\% slower than before the
+vector work. The \texttt{kites-cli} of the baseline commit \texttt{7ddb6f3} and of this branch
+were built in the same way (Debug, Apple Clang) and run alternately in batch mode on the
+single-cycle processor. \Cref{tab:perf} gives the median CPU time (user plus system) of each
+program. The pipelines could not be compared, because the baseline CLI never finishes on a
+pipeline model (F22).
+
+\begin{table}[H]
+\centering\small
+\caption{Scalar run time, baseline and current (median CPU time).}\label{tab:perf}
+\begin{tabularx}{\textwidth}{@{}YL{1.2cm}L{2.0cm}L{2.0cm}L{1.6cm}@{}}
+\toprule
+Program & Runs & Baseline (ms) & Current (ms) & Change \\
+\midrule
+cache\_matrix\_mul\_3x3.s & 21 & 206 & 197 & -4.4\,\% \\
+pipeline\_test\_code\_1.s & 21 & 37 & 39 & +7.3\,\% \\
+scalar loop (40\,002 instructions) & 5 & 4647 & 4350 & -6.4\,\% \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Kites writes \file{registers_dump.json} after every step. The first measurement showed scalar
+programs up to 65\,\% slower, because the dump had grown by the vector registers and the vector
+CSRs and was formatted value by value through stream manipulators. The dump is now built in one
+string with a direct hexadecimal formatter (byte-identical for the existing sections) and writes
+vector registers without leading zeros. Per instruction, the current build is now faster than
+the baseline. The remaining difference on the shortest program is a one-off start-up cost of
+about 3\,ms for building the vector instruction tables; its wall time is unchanged.

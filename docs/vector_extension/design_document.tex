@@ -1,0 +1,676 @@
+% Kites Vector Extension (RVV 1.0) - Design Document
+% Build: tectonic design_document.tex   (or: make)
+\documentclass[11pt]{article}
+\usepackage{kitesdoc}
+\usepackage[capitalise,noabbrev]{cleveref}
+\renewcommand{\kdocshorttitle}{Kites Vector Extension --- Design}
+\hypersetup{pdftitle={Kites Vector Extension (RVV 1.0): Design Document}}
+
+\begin{document}
+
+% =====================================================================  TITLE
+\begin{titlepage}
+\thispagestyle{empty}
+\vspace*{1.2cm}
+{\sffamily\small\color{kgrey} CS2323 Computer Architecture \quad$\cdot$\quad IIT Hyderabad}\par
+\vspace{0.6cm}
+{\sffamily\bfseries\fontsize{26}{31}\selectfont\color{kblue} Vector Extension Support\\[2pt] for the Kites RISC-V Simulator\par}
+\vspace{0.5cm}
+{\sffamily\Large\color{kteal} Design Document\par}
+\vspace{0.2cm}
+{\large RISC-V ``V'' extension 1.0, the Zve* subsets, and the Zvfh, Zvbb/Zvkb and Zvbc extensions\par}
+\vspace{1.4cm}
+
+\begin{tabularx}{\textwidth}{@{}L{3.6cm}Y@{}}
+\toprule
+\textsf{\textbf{Document}}   & Design document \\
+\textsf{\textbf{Version}}    & 1.0 \\
+\textsf{\textbf{Author}}     & Raam M \\
+\textsf{\textbf{Repository}} & \url{https://github.com/Raam-M/Kites}, branch \texttt{vector-extension} \\
+\textsf{\textbf{Companions}} & Scope document (requirements, decisions D1--D14, findings F1--F19); validation report (results) \\
+\bottomrule
+\end{tabularx}
+
+\vspace{1.0cm}
+\begin{keybox}[title=Purpose of this document]
+This document describes how the vector extension is built into Kites: the data structures, the
+execution model, how each instruction family is implemented, how vector instructions run on the
+single-cycle and the pipelined processors, the configuration options, the statistics and timing
+model, and the user interfaces. It records the design decisions and the known limitations. The
+\emph{why} of the scope is in the scope document; the evidence that the design works is in the
+validation report.
+\end{keybox}
+\vfill
+\end{titlepage}
+
+\tableofcontents
+\clearpage
+
+% =====================================================================  1
+\section{Overview}\label{sec:overview}
+
+Kites now implements the complete RISC-V vector extension~1.0~\cite{spec}: every one of the 627
+\textbf{V} instructions (375 base encodings and 252 segment variants), the standard vector
+pseudo-instructions, and the seven vector CSRs. On top of that it implements:
+
+\begin{itemize}
+\item the embedded subsets Zve64d, Zve64f, Zve64x, Zve32f and Zve32x as selectable profiles;
+\item Zvfh (half-precision floating point), Zvbb and its subset Zvkb (bit manipulation) and Zvbc
+      (carry-less multiply), 20 further base encodings;
+\item VLEN from 128 to 1024 bits and a choice of agnostic-element policy;
+\item execution on the single-cycle processor and on all four 5-stage pipeline models;
+\item vector statistics and an analytic timing model with lanes and chaining;
+\item a vector register viewer, a settings page, vector-unit wires in the circuit view, vector
+      commands in the CLI REPL, and vector instructions in custom pseudo-instructions.
+\end{itemize}
+
+\Cref{fig:arch} shows the parts and how they connect. The design rests on three ideas:
+
+\begin{enumerate}
+\item \textbf{One ISA table.} A table generated from riscv-opcodes~\cite{opcodes} describes every
+      vector instruction: name, fixed bits, operand fields and defining extension. The assembler,
+      disassembler, executor dispatch, editor support and tests all read it (D10).
+\item \textbf{Atomic execution.} A vector instruction reads a snapshot of the state, checks every
+      legality rule, computes its results into a staging area and only then commits them in one
+      step, recording each change for undo (D5). An illegal instruction therefore changes nothing.
+\item \textbf{Processor-independent vector unit.} The unit is a function,
+      \texttt{rvv::execute(word, context)}, that sees the register file, the memory controller
+      and the step record. The single-cycle processor calls it in its execute step; the pipelines
+      call it in write-back (\cref{sec:pipeline}).
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw=kblue,thick,rounded corners=2pt,fill=klight,align=center,font=\sffamily\small,minimum height=0.95cm,inner sep=4pt},
+  new/.style={box,fill=knew},
+  arr/.style={-{Stealth[length=2.2mm]},thick,kgrey}]
+\node[new] (table) at (0,0) {Vector ISA table\\\scriptsize\texttt{vector\_isa\_table.inc} (riscv-opcodes)};
+\node[box] (lexer) at (-4.6,1.9) {Lexer\\\scriptsize vector tokens};
+\node[new] (vparse) at (-4.6,0) {Vector parser\\\scriptsize\texttt{v\_formats.cpp}};
+\node[box] (prog) at (-4.6,-1.9) {Assembled program};
+\node[box] (rvss) at (0,-1.9) {RVSS\\\scriptsize execute step};
+\node[box] (rv5s) at (4.6,-1.9) {RV5S pipelines\\\scriptsize write-back};
+\node[new] (unit) at (2.3,-3.9) {Vector unit\\\scriptsize\texttt{rvv::execute}};
+\node[box] (regs) at (-1.4,-5.9) {Register file\\\scriptsize\texttt{v0}--\texttt{v31}, vector CSRs};
+\node[box] (mem) at (2.3,-5.9) {Memory controller\\\scriptsize caches};
+\node[new] (prof) at (6.0,-5.9) {Vector profiler\\\scriptsize statistics, timing};
+\node[new] (cfg) at (4.6,0) {Vector configuration\\\scriptsize VLEN, profile, extensions};
+\node[new] (ui) at (4.6,1.9) {GUI / CLI\\\scriptsize viewer, settings, REPL};
+\draw[arr] (lexer) -- (vparse);
+\draw[arr] (vparse) -- (prog);
+\draw[arr] (table) -- (vparse);
+\draw[arr] (prog) -- (rvss);
+\draw[arr] (prog.south) |- ++(0,-0.4) -| (rv5s.south west);
+\draw[arr] (rvss) -- (unit);
+\draw[arr] (rv5s) -- (unit);
+\draw[arr] (table) -- (unit);
+\draw[arr] (unit) -- (regs);
+\draw[arr] (unit) -- (mem);
+\draw[arr] (unit) -- (prof);
+\draw[arr] (cfg) -- (rv5s.north);
+\draw[arr] (ui) -- (cfg);
+\draw[arr] (cfg.south east) to[out=-30,in=60] (unit.north east);
+\end{tikzpicture}
+\caption{Architecture. Shaded yellow: new components; blue: existing components with hooks.}\label{fig:arch}
+\end{figure}
+
+% =====================================================================  2
+\section{Instruction set table}\label{sec:isa}
+
+\subsection{Generation}
+\file{tools/vector/gen_vector_isa.py} reads the riscv-opcodes files \file{rv_v}, \file{rv_zvbb}
+and \file{rv_zvbc} and writes \file{src/processor/vector/vector_isa_table.inc}, one line per base
+encoding:
+
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+KITES_RVV_INSN("vadd.vv", 0x00000057u, 0xfc00707fu, kVm | kVs2 | kVs1 | kVd, kExtV)
+KITES_RVV_INSN("vror.vi", 0x50003057u, 0xf800707fu, kZimm6 | kVm | kVs2 | kVd, kExtZvkb)
+\end{lstlisting}
+
+\texttt{match} holds the fixed bits, \texttt{mask} marks them, the fourth argument lists the
+variable fields and the last one names the defining extension. The generator checks that the
+fixed and variable fields cover all 32 bits exactly and that no instruction word matches two
+entries. Zvkb is the subset of Zvbb that riscv-opcodes' \file{rv_zvkn} imports
+(\insn{vandn}, \insn{vbrev8}, \insn{vrev8}, \insn{vrol}, \insn{vror}).
+
+\subsection{Run-time table}
+\file{vector_isa.cpp} expands the 395 base entries into 647 \texttt{InsnInfo} records: each
+unit-stride, strided and indexed load or store with an \texttt{nf} field gets seven segment
+variants (\insn{vlseg2e8.v} \ldots{} \insn{vlseg8e8.v}). Each record holds the mnemonic, its base
+and suffix, \texttt{match}/\texttt{mask}, the field set, the major opcode and \texttt{funct3}, the
+segment count, the extension, and the ordered list of \emph{assembly operands} derived from the
+fields (\cref{tab:operands}). Multiply-add instructions list the multiplier before \texttt{vs2},
+as the assembly syntax requires.
+
+\begin{table}[H]
+\centering\small
+\caption{Operand kinds derived from the fields.}\label{tab:operands}
+\begin{tabularx}{\textwidth}{@{}L{3.2cm}L{3.6cm}Y@{}}
+\toprule
+Kind & Fields & Assembly form \\
+\midrule
+Vector register & \texttt{vd}, \texttt{vs3}, \texttt{vs1}, \texttt{vs2} & \texttt{v0}--\texttt{v31} \\
+Integer register & \texttt{rd}, \texttt{rs1}, \texttt{rs2} & \texttt{x0}--\texttt{x31} or ABI names \\
+FP register & \texttt{rd}/\texttt{rs1} with OPFVV/OPFVF & \texttt{f0}--\texttt{f31} or ABI names \\
+Memory & \texttt{rs1} of a load/store & \texttt{(rs1)} or \texttt{0(rs1)} \\
+Immediate & \texttt{simm5}, \texttt{zimm5}, \texttt{zimm6} & $-16..15$, $0..31$, $0..63$ \\
+vtype immediate & \texttt{zimm10}, \texttt{zimm11} & \texttt{e32, m2, ta, ma} \\
+\texttt{v0} & fixed \texttt{vm}=0 & carry-in or merge selector \\
+Optional mask & \texttt{vm} & optional \texttt{, v0.t} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\texttt{zimm6} (\insn{vror.vi}) is split over bit~26 and bits 19..15; \texttt{getField} and
+\texttt{setField} handle it as one 6-bit value. \texttt{decode(word)} finds the entry whose
+\texttt{mask}/\texttt{match} fits the word. \texttt{isVectorInstruction(word)} recognises the
+vector encoding space: all of OP-V, and LOAD-FP/STORE-FP with widths 000, 101, 110 and 111.
+Widths 010 and 011 remain \insn{flw}/\insn{fld}/\insn{fsw}/\insn{fsd} (F6).
+
+% =====================================================================  3
+\section{Assembler and disassembler}\label{sec:asm}
+
+\paragraph{Lexing.} The lexer produces \texttt{VEC\_REGISTER} for \texttt{v0}--\texttt{v31},
+\texttt{VEC\_MASK} for \texttt{v0.t}, and \texttt{VTYPE\_FIELD} for \texttt{e8}\ldots\texttt{e64},
+\texttt{mf8}\ldots\texttt{m8}, \texttt{ta}/\texttt{tu}, \texttt{ma}/\texttt{mu} only on lines
+whose opcode is \insn{vsetvli} or \insn{vsetivli}. Elsewhere those words remain label references,
+so a label called \texttt{ta} still works (AS-04).
+
+\paragraph{Parsing.} \texttt{Parser::parse\_vector} handles every vector mnemonic generically. It
+splits the operand tokens into comma-separated groups and matches them against the
+instruction's operand list (\file{v_formats.cpp}, \texttt{encodeVector}). Each group must have the
+right kind; an immediate is checked against its range; the optional mask may be present only
+where \texttt{vm} is a field. The word is built from \texttt{match} with \texttt{setField} and
+attached to the instruction unit, so the code generator emits it unchanged. Errors report the
+line, the column and the expected syntax from \texttt{expectedSyntax}, for example
+``\texttt{vadd.vv vd, vs2, vs1[, v0.t]}''.
+
+\paragraph{Pseudo-instructions.} \texttt{parse\_vector\_pseudo} expands the standard vector
+pseudo-instructions (\insn{vneg.v}, \insn{vnot.v}, \insn{vwcvt.x.x.v}, \insn{vncvt.x.x.w},
+\insn{vfneg.v}, \insn{vfabs.v}, \insn{vmmv.m}, \insn{vmnot.m}, \insn{vmclr.m}, \insn{vmset.m},
+the reversed compares, \insn{vmsge(u).vx} with its masked and temporary-register forms, and
+\insn{vl<n>r.v}). \texttt{parse\_csr\_pseudo} adds \insn{csrr}, \insn{csrw}, \insn{csrs},
+\insn{csrc} and their immediate forms, with vector CSR names.
+
+\paragraph{Disassembly.} \texttt{rvv::disassemble} prints the mnemonic and the operands in table
+order. The disassembly view, the register dump and the error messages use it. Assembling its
+output gives the same word (AS-02).
+
+% =====================================================================  4
+\section{Architectural state}\label{sec:state}
+
+\texttt{RegisterFile} holds the vector registers as one byte array of $32\times\mathrm{VLENB}$
+bytes. Element $i$ of a register occupies the bytes $i\cdot\mathrm{SEW}/8$ upward,
+little-endian, so element~0 is in the lowest bytes. A register group of LMUL registers is
+contiguous in this array, which makes the group addressing of
+\cref{sec:execution} a simple offset calculation. \texttt{ReadVr}/\texttt{WriteVr} copy one
+register; \texttt{GetVrBytes} exposes the whole file to the viewer.
+
+\begin{table}[H]
+\centering\small
+\caption{Vector CSRs.}\label{tab:csrs}
+\begin{tabularx}{\textwidth}{@{}L{1.8cm}L{1.6cm}L{1.9cm}Y@{}}
+\toprule
+CSR & Address & Access & Implementation \\
+\midrule
+\texttt{vstart} & 0x008 & read/write & reset to 0 after every vector instruction \\
+\texttt{vxsat}  & 0x009 & read/write & bit 0 only \\
+\texttt{vxrm}   & 0x00A & read/write & bits 1:0 only \\
+\texttt{vcsr}   & 0x00F & read/write & composite: reads \texttt{(vxrm << 1) | vxsat}, writes both \\
+\texttt{vl}     & 0xC20 & read-only  & written only by \insn{vset*} and fault-only-first loads \\
+\texttt{vtype}  & 0xC21 & read-only  & \texttt{vill} in bit 63 \\
+\texttt{vlenb}  & 0xC22 & read-only  & VLEN/8, set when the register file is reset \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Writing a read-only CSR (address bits 11:10 = 11) is an illegal instruction on every processor.
+Reset sets \texttt{vtype.vill}=1 and \texttt{vl}=0 and clears the vector registers (D4). VLEN is
+read from the configuration on reset, so a new VLEN applies at the next reset or assemble.
+
+% =====================================================================  5
+\section{Execution model}\label{sec:execution}
+
+\subsection{One instruction, one atomic step}
+
+\texttt{rvv::execute(word, context)} runs one instruction. The context holds references to the
+register file, the memory controller and the current step record (\texttt{StepDelta}), and
+optionally the profiler and the processor cycle. Execution has three phases:
+
+\begin{enumerate}
+\item \textbf{Set-up.} An \texttt{ExecState} decodes the fields, reads \texttt{vtype},
+      \texttt{vl}, \texttt{vstart} and VLEN, and takes a snapshot of the vector registers
+      (\texttt{source}) and a working copy (\texttt{destination}). The instruction's extension
+      must be enabled (\cref{sec:config}).
+\item \textbf{Checks and computation.} The family handler checks every legality rule first:
+      \texttt{vill}, register-group alignment (\texttt{checkGroup}), EMUL within $[1/8, 8]$,
+      the overlap rules (\texttt{checkOverlap}, \texttt{forbidOverlap},
+      \texttt{checkMaskOverlap}), \texttt{vstart}=0 where required, and the supported SEW. Then
+      it loops over the elements. Reads come from the snapshot and writes go to the working copy,
+      so an instruction whose source and destination overlap reads the old values.
+      Scalar results, CSR updates, \texttt{fflags} and stores are staged.
+\item \textbf{Commit.} \texttt{commit} writes the changed vector registers, the staged scalar
+      register, the CSRs and the memory, and records every old and new value in the step
+      record. It then sets \texttt{vstart} to 0.
+\end{enumerate}
+
+A rule violation throws \texttt{IllegalInstruction}, and an access outside memory throws
+\texttt{AccessFault}, before phase~3, so nothing has changed (D5). The processor leaves the PC on
+the instruction, and Kites shows the message with the source line.
+
+\subsection{Element loop, masking and policies}
+
+For every body element $i$ with $\texttt{vstart} \le i < \texttt{vl}$, the handler asks
+\texttt{active(i)}: true when the instruction is unmasked or bit $i$ of \texttt{v0} is set.
+Active elements get the result. Inactive elements and tail elements ($i \ge \texttt{vl}$) go
+through \texttt{inactive()} and \texttt{tail()}, which apply the policy: undisturbed
+leaves the element alone; with the all-ones fill selected (\cref{sec:config}) and
+\texttt{vma}/\texttt{vta} set, the element becomes all ones. Mask-producing instructions treat
+their tail as agnostic, as the specification requires. Elements below \texttt{vstart} are never
+touched.
+
+\subsection{Register groups}
+
+\texttt{group(reg, eew)} returns the register, the element width and
+$\mathrm{EMUL} = (\mathrm{EEW}/\mathrm{SEW})\cdot\mathrm{LMUL}$. Element $i$ of a group lives at
+byte offset $\texttt{reg}\cdot\mathrm{VLENB} + i\cdot\mathrm{EEW}/8$ of the register array, so
+groups need no special indexing. Widening, narrowing, extension, index and mask operands all use
+the same accessor with their own EEW.
+
+% =====================================================================  6
+\section{Instruction families}\label{sec:families}
+
+\subsection{Configuration}
+\insn{vsetvli}, \insn{vsetivli} and \insn{vsetvl} compute
+$\mathrm{VLMAX} = \mathrm{LMUL}\cdot\mathrm{VLEN}/\mathrm{SEW}$ and set
+$\texttt{vl} = \min(\mathrm{AVL}, \mathrm{VLMAX})$ (D2). \texttt{rs1}=\texttt{x0} with
+\texttt{rd}$\neq$\texttt{x0} requests VLMAX; \texttt{rs1}=\texttt{rd}=\texttt{x0} keeps
+\texttt{vl} and sets \texttt{vill} if VLMAX would change. A vtype with reserved bits, a reserved
+\texttt{vlmul}, SEW above ELEN, or $\mathrm{SEW} > \mathrm{LMUL}\cdot\mathrm{ELEN}$ sets
+\texttt{vill}=1 and \texttt{vl}=0 (D4). ELEN depends on the profile, so under Zve32* SEW=64 and
+LMUL=1/8 are reserved.
+
+\subsection{Loads and stores}
+\file{vector_exec_memory.cpp} handles unit-stride, strided, indexed (ordered and unordered),
+segment, fault-only-first, mask and whole-register accesses. Each element is a separate access
+through the \texttt{MemoryController} in increasing element (and field) order, so caches see the
+traffic and the ordered and unordered indexed forms behave the same (D8). Misaligned element
+addresses are allowed. Loads write the working copy; stores are staged and committed with the
+rest of the instruction. A fault-only-first load that faults on element $i>0$ trims
+\texttt{vl} to $i$; on element 0 it is an access fault. An EEW above ELEN is illegal.
+
+\subsection{Integer and fixed point}
+\file{vector_exec_integer.cpp} dispatches on the base mnemonic through tables of element
+operations: single-width arithmetic, multiply-add, widening and narrowing, extension, carry and
+borrow, compares, merges and moves, reductions, mask logical operations, \insn{vcpop.m},
+\insn{vfirst.m}, \insn{vmsbf}/\insn{vmsif}/\insn{vmsof}, \insn{viota}, \insn{vid}, slides,
+gathers, compress and whole-register moves. Division by zero and signed overflow give the
+RISC-V results. The high halves of 64-bit products use portable 64$\times$64-bit helpers, not
+\texttt{\_\_int128} (F9). Fixed-point instructions round with \texttt{vxrm} (rnu, rne, rdn,
+rod) and set \texttt{vxsat} on saturation.
+
+\subsection{Floating point}
+\file{vector_exec_float.cpp} does not use the scalar FP unit, which deviates from the
+specification (F16). For SEW = 32 and 64 it uses host IEEE~754 arithmetic: the rounding mode comes
+from \texttt{frm} (\texttt{HostRounding}), the host exception flags are cleared before and read
+after each element, and they are accrued into \texttt{fflags} in the RISC-V bit order (D9). On
+top of that it applies the RISC-V rules explicitly: canonical NaN results; minimumNumber and
+maximumNumber for \insn{vfmin}/\insn{vfmax}; quiet and signalling compares; saturating
+float-to-integer conversion; round-to-odd for \insn{vfncvt.rod.f.f.w}; and the 7-bit estimates
+\insn{vfrec7}/\insn{vfrsqrt7} from the specification's tables, bit-exact including their special
+cases. The code is templated on a format descriptor, so each operation is written once for all
+widths.
+
+\subsection{Half precision (Zvfh)}\label{sec:half}
+There is no portable half-precision host type, so binary16 is handled in software. A half
+operation converts its operands exactly to double, computes the operation in double under the
+same rounding mode, and rounds the double result to half with \texttt{roundToHalf}. That
+function implements all four host rounding modes and raises inexact, overflow and underflow with
+tininess detected \emph{after rounding}, as RISC-V requires.
+
+The double rounding does not change the result. Sums, differences, products and integer
+conversions of halves are exact in double. For division and square root, rounding first to a
+format with $p' \ge 2p+2$ significand bits and then to $p$ bits gives the correctly rounded
+result~\cite{figueroa}; here $p=11$ and $p'=53$. For fused multiply-add, the product of two halves is exact in
+double; the sum is rounded once to double and then to half. A difference could only arise if the
+two addends were more than 53 bit positions apart and the larger one lay exactly halfway between
+two halves. The larger addend is then either a half, which cannot lie halfway, or a product of at
+least $2^{29}$, which overflows half anyway. Under the directed modes, both roundings go in the
+same direction. A signalling NaN operand raises invalid explicitly, because the software
+conversion does not. Widening operations convert halves exactly to single and then use the
+single-precision path; narrowing conversions round single to half with \texttt{roundToHalf}.
+
+\subsection{Unordered reductions}
+\insn{vfredusum} and \insn{vfwredusum} add in element order, which is one of the orders the
+specification allows. When no element is active, the specification also allows adding an
+additive identity to \texttt{vs1[0]}. Kites makes the same choice as Spike: a NaN scalar becomes
+the canonical NaN, and a signalling NaN raises invalid.
+
+\subsection{Bit manipulation and carry-less multiply}
+Zvkb adds \insn{vandn}, \insn{vrol}, \insn{vror} (with the 6-bit \insn{vror.vi} immediate),
+\insn{vbrev8} and \insn{vrev8}. Zvbb adds \insn{vbrev}, \insn{vclz}, \insn{vctz}, \insn{vcpop.v}
+and the widening shift \insn{vwsll}, which zero-extends \texttt{vs2} and shifts by the low
+$\log_2(2\cdot\mathrm{SEW})$ bits of the operand. Zvbc adds \insn{vclmul} and \insn{vclmulh},
+defined only for SEW=64. The binary operations reuse the single-width loop; the unary ones have
+their own small handler.
+
+% =====================================================================  7
+\section{Configuration}\label{sec:config}
+
+\texttt{rvv::VectorConfig} (\file{vector_config.h}) holds the run-time options. The CLI flags,
+the GUI settings page and the REPL command \texttt{vconfig} all write the same structure.
+
+\begin{table}[H]
+\centering\small
+\caption{Configuration options.}\label{tab:config}
+\begin{tabularx}{\textwidth}{@{}L{2.6cm}L{3.2cm}Y@{}}
+\toprule
+Option & Values & Effect \\
+\midrule
+VLEN & 128, 256, 512, 1024 & register width; applied at the next reset \\
+Agnostic fill & undisturbed, ones & value of agnostic tail and inactive elements (D3) \\
+Profile & V, Zve64d/f/x, Zve32f/x & ELEN, FP widths, 64-bit high multiplies (\cref{tab:profiles}) \\
+Extensions & Zvfh, Zvbb, Zvkb, Zvbc & enable the instructions; Zvbb implies Zvkb \\
+Timing lanes & 1, 2, \ldots, 32 & timing model (\cref{sec:timing}) \\
+Chaining & on, off & timing model \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{Profiles. A ``--'' means the restriction does not apply because SEW=64 is not available.}\label{tab:profiles}
+\begin{tabularx}{\textwidth}{@{}L{2cm}L{1.2cm}L{3.2cm}Y@{}}
+\toprule
+Profile & ELEN & FP element widths & \insn{vmulh*}, \insn{vsmul} at SEW=64 \\
+\midrule
+V       & 64 & 32, 64 (+16 with Zvfh) & yes \\
+Zve64d  & 64 & 32, 64 (+16 with Zvfh) & no \\
+Zve64f  & 64 & 32 (+16 with Zvfh) & no \\
+Zve64x  & 64 & none & no \\
+Zve32f  & 32 & 32 (+16 with Zvfh) & -- \\
+Zve32x  & 32 & none & -- \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\texttt{validate} rejects combinations the specification does not allow: Zvfh without an F
+profile, and Zvbc with ELEN=32. An instruction of a disabled extension, an FP instruction at an
+unsupported width, or an EEW above ELEN is an illegal instruction. The assembler accepts every
+instruction regardless of the configuration, as hardware assemblers do with the right flags;
+legality is decided when the instruction executes.
+
+% =====================================================================  8
+\section{Pipelined execution}\label{sec:pipeline}
+
+\subsection{Execute in write-back}
+
+On the four 5-stage models (no hazard detection or forwarding; hazard detection without
+forwarding; forwarding without hazard detection; both), vector instructions and Zicsr CSR
+instructions execute atomically in \textbf{WB}. Decode treats them like a bubble with no control
+signals; they pass through EX and MEM without effect; \texttt{pipeline\_writeback} calls
+\texttt{rvv::execute} (or the CSR routine) for the instruction in MEM/WB before anything else in
+the cycle. This keeps the vector unit identical for all processors and gives four properties
+without extra logic:
+
+\begin{description}[style=nextline,leftmargin=0.6cm,font=\sffamily\bfseries\color{kblue}]
+\item[Scalar operands are current.] Every older instruction has already written back, so the
+  vector unit reads its scalar operands from the register file with no forwarding.
+\item[Memory order is program order.] A Kites step runs WB before MEM. An older scalar store has
+  finished its MEM stage in an earlier cycle. A younger scalar load or store runs its MEM stage in
+  the same or a later cycle, after the vector access.
+\item[Exceptions are precise.] Write-back runs first in a step. An illegal vector instruction
+  stops the step before any younger instruction has written anything. The PC is set to the
+  instruction for the error report, and stepping again reports the same error.
+\item[Wrong-path instructions never execute.] Branches resolve in MEM and jumps in EX. Both flush
+  the younger stages before those instructions reach WB.
+\end{description}
+
+\subsection{Hazards}
+
+A vector or CSR instruction never waits for an older instruction. A younger scalar instruction
+must wait in two cases, checked in IF/ID after the existing hazard unit
+(\texttt{writeback\_dependency\_stall}):
+
+\begin{enumerate}
+\item it reads a register that an older vector or CSR instruction still in EX/MEM or MEM/WB
+      writes (\texttt{rd} of \insn{vset*}, \insn{vmv.x.s}, \insn{vcpop.m}, \insn{vfirst.m},
+      \insn{csrr*}; the FP register of \insn{vfmv.f.s});
+\item it is a scalar FP operation, which reads \texttt{frm} and writes \texttt{fflags} in EX,
+      while any vector or CSR instruction is in flight.
+\end{enumerate}
+
+The stall is re-evaluated every cycle. A value produced in WB cannot be forwarded, so a dependent
+instruction waits two cycles on both hazard-detecting models, as for a load without forwarding.
+The models without hazard detection do not stall: the program must separate such a producer and
+its consumer by two instructions, the same rule as for a load on those models.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[x=1.15cm,y=0.62cm,font=\sffamily\scriptsize]
+\foreach \c in {1,...,9} \node at (\c,0.9) {\c};
+\node[anchor=east] at (0.4,0) {\insn{vmv.x.s a0, v1}};
+\node[anchor=east] at (0.4,-1) {\insn{addi a1, a0, 1}};
+\foreach \s/\c in {IF/1,ID/2,EX/3,MEM/4} \node[draw=kgrey,fill=klight,minimum width=1.0cm] at (\c,0) {\s};
+\node[draw=kblue,fill=knew,minimum width=1.0cm] at (5,0) {WB*};
+\foreach \s/\c in {IF/2} \node[draw=kgrey,fill=klight,minimum width=1.0cm] at (\c,-1) {\s};
+\foreach \c in {3,4} \node[draw=kmust,fill=white,minimum width=1.0cm] at (\c,-1) {stall};
+\foreach \s/\c in {ID/5,EX/6,MEM/7,WB/8} \node[draw=kgrey,fill=klight,minimum width=1.0cm] at (\c,-1) {\s};
+\end{tikzpicture}
+\caption{A scalar instruction that uses a vector result. WB* is where the vector instruction
+executes; WB runs first in a cycle, so ID in cycle 5 reads the new \texttt{a0}.}\label{fig:stall}
+\end{figure}
+
+\subsection{CSR instructions}
+CSR instructions used to be no-ops on the pipelines. They now execute in WB through the same path
+as vector instructions, with the same read-only check as the single-cycle processor, so programs
+can set \texttt{vxrm} or read \texttt{vl} and \texttt{vlenb}.
+
+\subsection{Scalar defects fixed along the way}
+Running vector programs on the pipelines exposed three existing defects, fixed in separate
+commits with regression tests: AUIPC computed a register sum instead of $\mathrm{PC}+\mathrm{imm}$
+(so \insn{la} gave wrong addresses on every pipeline) and LUI did not sign-extend; the
+forwarding models did not forward the integer source of F/D instructions (load/store base,
+\insn{fmv.w.x}, \insn{fcvt.s.w}); and \texttt{Run()} paused at the end-of-program breakpoint
+while draining, so \texttt{kites-cli} never finished on a pipeline model.
+
+% =====================================================================  9
+\section{Statistics and timing model}\label{sec:timing}
+
+\subsection{Statistics}
+After a successful commit the vector unit passes an \texttt{InstructionRecord} to the processor's
+\texttt{VectorProfiler}: the instruction, SEW, LMUL, \texttt{vl}, VLMAX, \texttt{vstart}, the
+number of body, active and masked-off elements, the bytes loaded and stored, and two 32-bit masks
+of the vector registers read and written (collected by the element accessors). The profiler
+counts instructions per class (configuration, load, store, integer, fixed point, floating point,
+reduction, mask, permutation, bit manipulation) and per mnemonic, the average \texttt{vl} and
+$\sum\texttt{vl} / \sum\mathrm{VLMAX}$, active and masked-off elements, bytes moved, and SEW and
+LMUL use.
+
+\subsection{Timing model}
+The model estimates how long the vector part of a program takes on a decoupled vector unit. The
+unit issues vector instructions in program order, at most one per cycle, and not before the cycle
+in which the processor reached the instruction. Each unit class (integer ALU, multiply, divide,
+FP add, FP multiply, FP divide, load, store, reduction, permute, mask) has one pipelined unit with
+$L$ lanes. With start-up latency $\lambda$ for the unit and $n$ body elements, an instruction:
+
+\begin{itemize}
+\item occupies its unit for $b = \lceil n/L\rceil$ cycles. Strided and indexed accesses move one
+      element per cycle, mask logical operations process $64L$ bits per cycle, and reductions add
+      $\log_2 L$ cycles to combine the lanes;
+\item starts at $s = \max(\text{issue}, s_\text{prev}+1, \text{unit free}, \text{operands ready})$,
+      where an operand is ready at the producer's first result $s_p+\lambda_p$ with chaining, or
+      at its last result $s_p+\lambda_p+b_p$ without;
+\item finishes at $e = s + \lambda + b$, and its unit is free again at $s + b$.
+\end{itemize}
+
+The estimate is $\max e$ minus the issue cycle of the first vector instruction. The default
+latencies follow the VMIPS example in Hennessy and Patterson~\cite{hp}: 6 cycles for add, 7 for
+multiply, 20 for divide and 12 for load and store. Convoys also follow the textbook: consecutive
+instructions form one convoy until one needs a unit already used in the convoy or, without
+chaining, reads a register written in it. The number of convoys is the chime count.
+
+\begin{table}[H]
+\centering\small
+\caption{Worked example, \texttt{vl}=8: \insn{vsetivli} issues at cycle 0, \insn{vle32.v v8} at 1,
+\insn{vadd.vv v16, v8, v8} at 2.}\label{tab:timing}
+\begin{tabularx}{\textwidth}{@{}L{3.4cm}YYYY@{}}
+\toprule
+ & 4 lanes, chaining & 4 lanes, no chaining & 1 lane, chaining & 1 lane, no chaining \\
+\midrule
+load: start, first, last & 1, 13, 15 & 1, 13, 15 & 1, 13, 21 & 1, 13, 21 \\
+add: start & 13 & 15 & 13 & 21 \\
+estimate (cycles) & 21 & 23 & 27 & 35 \\
+convoys & 1 & 2 & 1 & 2 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The model is an estimate for comparing code and configurations, not a cycle-accurate
+simulation. It does not model vector-to-scalar register dependencies, memory banks, or the
+scalar instructions' own timing.
+
+\subsection{Undo and reset}
+Each step record keeps the profiler state before and after a vector instruction. Undo restores
+the state from before, redo the state from after, and reset clears it, so the statistics always
+match the visible program state.
+
+% =====================================================================  10
+\section{User interfaces}\label{sec:ui}
+
+\begin{description}[style=nextline,leftmargin=0.6cm,font=\sffamily\bfseries\color{kblue}]
+\item[Register panel] The \emph{Vector} section lists \texttt{v0}--\texttt{v31} in hex; the
+  \emph{Vector CSRs} section shows \texttt{vl}, the decoded \texttt{vtype}, \texttt{vstart},
+  \texttt{vxrm}, \texttt{vxsat}, \texttt{vcsr} and \texttt{vlenb}.
+\item[Vector tab] A table of the 32 registers split into elements at the current SEW or a chosen
+  one, shown as hex, unsigned, signed or floating point (including half). Tail elements are
+  dimmed, masked-off elements can be shaded, LMUL groups are banded, and elements changed since
+  the last update are highlighted. The vector CSRs are shown above the table and the statistics
+  and timing report below it. Updates are coalesced so a fast run does not flood the GUI thread.
+\item[Settings] \emph{Settings $\rightarrow$ Vector Extension} edits the options of
+  \cref{tab:config}. They are saved with \texttt{QSettings} and applied at start-up before the
+  processors are created.
+\item[Circuit view] Every processor design has a \emph{Vector Unit} and a \emph{Vector Regs}
+  block with five wires: scalar operands and results to and from the register file, vector
+  register reads and writes, and memory. The pipelines have a sixth wire from MEM/WB. The wires
+  light up while a vector instruction executes (in WB on the pipelines).
+  \file{tools/vector/add_vector_unit_to_circuits.py} adds the blocks without reformatting the
+  design files.
+\item[CLI] The \texttt{kites-cli} options \texttt{--vlen}, \texttt{--vector-agnostic} and
+  \texttt{--vector-ext} set the configuration, and a batch run also writes
+  \file{vector_stats.json}. The REPL adds
+  \texttt{vregs}/\texttt{vreg} (elements in any SEW and format), \texttt{vcsr},
+  \texttt{vconfig} and \texttt{vstats}.
+\item[Custom pseudo-instructions] An expansion line may use vector instructions. Each operand is
+  checked against the instruction's operand list: vector, integer and FP registers, a
+  \texttt{(base)} memory operand, immediate ranges, vtype fields and \texttt{v0.t}. Arguments
+  are substituted inside \texttt{(\ldots)} too.
+\item[Editor] The editor highlights vector mnemonics and registers and offers them in
+  autocompletion; both read \file{resources/instructions/instructions.json}. The profiler counts
+  vector instructions as \texttt{V-Type}.
+\end{description}
+
+% =====================================================================  11
+\section{Design decisions}\label{sec:decisions}
+
+The decisions D1--D14 of the scope document hold, with these refinements:
+
+\small
+\begin{longtable}{@{}L{0.9cm}L{6.1cm}L{8.1cm}@{}}
+\caption{Decisions added or revised during the implementation.}\label{tab:decisions}\\
+\toprule
+ID & Decision & Rationale \\
+\midrule
+\endfirsthead
+\caption[]{Decisions (continued).}\\
+\toprule
+ID & Decision & Rationale \\
+\midrule
+\endhead
+D12$'$ & Supersedes D12: the pipelines execute vector and CSR instructions in WB, with a stall for dependent scalar instructions (\cref{sec:pipeline}). & One vector unit for every processor; precise exceptions and program-order memory access follow from the existing step order. \\
+D14$'$ & Supersedes D14: every vector mnemonic assembles; legality depends on the configuration at execution time. & Configuration (profile, extensions) can change without re-assembling; matches how hardware treats unsupported encodings. \\
+D15 & Zve* profiles, Zvfh, Zvbb/Zvkb and Zvbc are options; the default configuration is plain V with VLEN=128. & The defaults keep the behaviour of the scope; each option is validated against the specification's combination rules. \\
+D16 & Half precision is computed through double with a software rounding step. & Portable (no compiler half type needed), correctly rounded (\cref{sec:half}), and RISC-V tininess detection. \\
+D17 & \insn{vfredusum}/\insn{vfwredusum} with no active element canonicalise a NaN scalar. & An allowed choice that matches Spike, the reference model. \\
+D18 & The timing model is analytic and separate from the processors' cycle counts. & Shows the effect of lanes and chaining without changing the existing cycle semantics of the single-cycle and pipeline models. \\
+D19 & Statistics are part of the undoable state. & Undo, redo and reset keep statistics consistent with the program state. \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+% =====================================================================  12
+\section{Known limitations}\label{sec:limits}
+
+\begin{itemize}
+\item \texttt{frm}=RMM rounds ties to even in floating-point arithmetic, because the host has no
+      such mode. Conversions to integer honour RMM.
+\item For SEW 32 and 64, underflow uses the host's tininess rule. Half precision detects
+      tininess after rounding.
+\item Scalar single and half values are kept zero-extended in the \texttt{f} registers, as in
+      Kites' F extension (F18), not NaN-boxed. \texttt{.vf} operands use the low SEW bits.
+\item Kites has no traps: an illegal instruction or access fault stops the program, and
+      \texttt{vstart} is non-zero only after an explicit CSR write.
+\item On the pipeline models without hazard detection, a scalar instruction that reads a vector
+      or CSR result must be two instructions after it.
+\item The timing model is not cycle-accurate (\cref{sec:timing}).
+\end{itemize}
+
+% =====================================================================  13
+\section{Source files}\label{sec:files}
+
+\small
+\begin{longtable}{@{}L{6.4cm}L{8.7cm}@{}}
+\caption{New and changed files.}\label{tab:files}\\
+\toprule
+File & Role \\
+\midrule
+\endfirsthead
+\caption[]{New and changed files (continued).}\\
+\toprule
+File & Role \\
+\midrule
+\endhead
+\file{src/processor/vector/vector_isa_table.inc} & generated encodings \\
+\file{src/processor/vector/vector_isa.*} & ISA table, decode, operands, disassembly \\
+\file{src/processor/vector/vtype.*} & vtype decode/encode, VLMAX, legality \\
+\file{src/processor/vector/vector_config.*} & VLEN, policy, profile, extensions \\
+\file{src/processor/vector/vector_unit.*} & \texttt{execute}, \texttt{ExecState}, legality helpers, commit \\
+\file{src/processor/vector/vector_exec.h} & shared declarations of the families \\
+\file{src/processor/vector/vector_exec_integer.cpp} & integer, fixed point, mask, reduction, permutation, Zvbb/Zvbc \\
+\file{src/processor/vector/vector_exec_memory.cpp} & loads and stores \\
+\file{src/processor/vector/vector_exec_float.cpp} & floating point, half precision \\
+\file{src/processor/vector/vector_profiler.*} & statistics and timing model \\
+\file{src/processor/vector/vector_format.*} & element formatting for the CLI and GUI \\
+\file{src/assembler/parse_formats/v_formats.cpp} & vector parser, pseudo-instructions, CSR pseudos \\
+\file{src/assembler/lexer.cpp}, \file{parser.*}, \file{code_generator.*} & vector tokens, dispatch, pre-encoded words \\
+\file{src/processor/registers.*} & vector registers and CSRs \\
+\file{src/processor/rvss/rvss_processor.*} & vector execution, undo/redo, CSR read-only check \\
+\file{src/processor/rv5s/*} & WB execution, stall, CSRs, scalar fixes \\
+\file{src/processor/processor_base.*} & step record, profiler, circuit wires \\
+\file{src/ui/vector_tab/*}, \file{src/ui/dialogs/settings_dialog.*} & vector viewer, settings page \\
+\file{src/ui/register_table/*} & Vector and Vector CSRs sections \\
+\file{src/custom_pseudo_manager/*} & vector expansions \\
+\file{cli/main.cpp}, \file{cli/repl.cpp} & flags and REPL commands \\
+\file{resources/circuit_designs/*.json} & vector unit blocks and wires \\
+\file{tools/vector/*} & table and golden generators, Spike harness, circuit script \\
+\file{test/vector/*}, \file{test/rv5s_regression_test.cpp} & tests \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+% =====================================================================  REFERENCES
+\begin{thebibliography}{99}\small\markboth{References}{References}
+\bibitem{spec} RISC-V International. \emph{The RISC-V Instruction Set Manual, Volume I: Unprivileged
+  Architecture}, ``V'' Standard Extension for Vector Operations, version 1.0, and the Zvfh, Zvbb,
+  Zvkb and Zvbc extensions. \url{https://docs.riscv.org/reference/isa/v20260120/unpriv/v-st-ext.html}
+\bibitem{opcodes} RISC-V International. \emph{riscv-opcodes}. \url{https://github.com/riscv/riscv-opcodes}
+\bibitem{spike} RISC-V Software. \emph{Spike RISC-V ISA Simulator}.
+  \url{https://github.com/riscv-software-src/riscv-isa-sim}
+\bibitem{hp} J.~L.~Hennessy and D.~A.~Patterson. \emph{Computer Architecture: A Quantitative
+  Approach}, 6th ed., Chapter 4. Morgan Kaufmann, 2017.
+\bibitem{figueroa} S.~A.~Figueroa. ``When is double rounding innocuous?'' \emph{ACM SIGNUM
+  Newsletter} 30(3), 1995.
+\end{thebibliography}
+
+\end{document}
