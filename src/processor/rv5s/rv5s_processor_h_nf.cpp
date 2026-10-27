@@ -159,12 +159,18 @@ void RV5StageProcessorHNF::Step()
     {
         stall_cycles_--;
     }
-    else
+    else if (!completes_at_writeback(if_id_reg_.instruction))
     {
+        // Vector and CSR instructions read their scalar operands in WB and never wait here.
         stalls_needed = check_data_hazard(if_id_reg_, id_ex_reg_, ex_mem_reg_, false);
         if (stalls_needed > 0)
         {
             stall_cycles_ = stalls_needed - 1;
+        }
+        else if (writeback_dependency_stall())
+        {
+            // Re-checked every cycle until the older instruction has completed in WB.
+            stalls_needed = 1;
         }
     }
 

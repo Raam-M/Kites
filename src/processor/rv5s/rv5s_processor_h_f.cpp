@@ -219,15 +219,22 @@ void RV5StageProcessorHF::Step()
         stall_cycles_--;
         stalls_needed = 1; // Indicate we are continuing the stall (1 cycle consumed)
     }
-    else
+    else if (!completes_at_writeback(if_id_reg_.instruction))
     {
         // Pipeline is free. Check for a NEW hazard using the external HDU function.
+        // Vector and CSR instructions read their scalar operands in WB and never wait here.
         stalls_needed = check_data_hazard(if_id_reg_, id_ex_reg_, ex_mem_reg_,
                                           true /* is_forwarding_enabled */);
         if (stalls_needed > 0)
         {
             // Start the stall: stalls_needed cycles total. 1 cycle is handled now.
             stall_cycles_ = stalls_needed - 1;
+        }
+        else if (writeback_dependency_stall())
+        {
+            // Results produced in WB cannot be forwarded: wait until the producer has
+            // completed. Re-checked every cycle.
+            stalls_needed = 1;
         }
     }
 

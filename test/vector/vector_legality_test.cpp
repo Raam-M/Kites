@@ -1,14 +1,11 @@
 /**
  * @file vector_legality_test.cpp
  * @brief Illegal vector usage is rejected with an error and leaves all state unchanged (VL-01),
- * plus system-level behaviour: undo/redo (SI-02) and the pipeline guard (SI-04).
+ * plus system-level behaviour: undo/redo (SI-02). Pipeline execution (SI-04) is tested in
+ * vector_pipeline_test.cpp.
  */
 #include "vector_test_support.h"
 
-#include "processor/rv5s/rv5s_processor_h_f.h"
-#include "processor/rv5s/rv5s_processor_h_nf.h"
-#include "processor/rv5s/rv5s_processor_nh_f.h"
-#include "processor/rv5s/rv5s_processor_nh_nf.h"
 #include "processor/vector/vector_unit.h"
 #include "processor/vector/vtype.h"
 
@@ -187,26 +184,6 @@ out: .dword 0, 0, 0, 0, 0, 0, 0, 0
         }
     }
     EXPECT_TRUE(state() == final);
-}
-
-// SI-04: the 5-stage models reject vector instructions instead of mis-executing them.
-template <typename Processor>
-void expectPipelineRejects()
-{
-    QuietOutput quiet;
-    setupVmStateDirectory();
-    Processor vm;
-    std::istringstream in(".text\naddi x1, x0, 1\nvsetvli t0, x0, e8, m1, ta, ma\naddi x2, x0, 2\n");
-    vm.LoadProgram(assemble(in));
-    EXPECT_THROW(vm.DebugRun(), std::runtime_error);
-}
-
-TEST(VecSystem, SI04_pipelines_reject_vector_instructions)
-{
-    expectPipelineRejects<RV5StageProcessorNHNF>();
-    expectPipelineRejects<RV5StageProcessorHNF>();
-    expectPipelineRejects<RV5StageProcessorNHF>();
-    expectPipelineRejects<RV5StageProcessorHF>();
 }
 
 // SI-01: one vector instruction retires as one instruction in one cycle.

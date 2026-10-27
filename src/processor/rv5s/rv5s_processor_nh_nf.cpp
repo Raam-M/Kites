@@ -205,12 +205,6 @@ void RV5StageProcessorNHNF::pipeline_execute()
         return;
     }
 
-    if (opcode == 0b1110011)
-    {
-        execute_csr();
-        return;
-    }
-
     // Select ALU inputs
     uint64_t alu_in1 = id_ex_reg_.reg1_data;
     uint64_t alu_in2 =

@@ -108,6 +108,17 @@ class RV5StageVM_Base : public ProcessorBase
     // when the instruction just ahead produced it; otherwise the register file is current.
     uint64_t forwarded_fp_gpr_source(unsigned reg) const;
 
+    // --- Instructions that complete in WB ---
+    // Vector and Zicsr instructions pass through IF..MEM as bubbles and execute atomically in
+    // WB, after every older instruction has written back.
+    static bool completes_at_writeback(uint32_t instruction);
+    void execute_at_writeback();
+    void writeback_csr(uint32_t instruction);
+    // True when the scalar instruction in IF/ID must wait for an older instruction that
+    // completes in WB: it reads a register that instruction writes, or it is a scalar
+    // floating-point operation (it reads frm and writes fflags in EX).
+    bool writeback_dependency_stall() const;
+
     void pipeline_memory();
     void pipeline_writeback();
     void pipeline_writeback_float();

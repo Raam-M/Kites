@@ -2,6 +2,8 @@
 #include "common/instructions.h"
 #include "processor/rv5s/rv5s_processor_base.h"
 #include "processor/vector/vector_isa.h"
+#include "processor/vector/vector_unit.h"
+#include <optional>
 #include <thread>
 
 namespace Kites
@@ -173,13 +175,8 @@ void RV5StageVM_Base::setProcessorState()
 void RV5StageVM_Base::pipeline_decode()
 {
     uint32_t instruction = if_id_reg_.instruction;
-    if (rvv::isVectorInstruction(instruction))
-    {
-        throw std::runtime_error("Vector instruction '" + instruction_set::disassemble(instruction) +
-                                 "': vector instructions are supported only on the single-cycle "
-                                 "processor");
-    }
-    if (instruction == NOP)
+    // Vector and CSR instructions travel to WB without control signals and execute there.
+    if (instruction == NOP || completes_at_writeback(instruction))
     {
         // Pass through fields as needed
         id_ex_reg_.pc          = if_id_reg_.pc;
@@ -584,6 +581,13 @@ void RV5StageVM_Base::pipeline_memory()
 
 void RV5StageVM_Base::pipeline_writeback()
 {
+    // WB runs first in a step, so an illegal vector or CSR instruction stops the step before
+    // any state changes.
+    if (mem_wb_reg_.pc != INVALID_PC && completes_at_writeback(mem_wb_reg_.instruction))
+    {
+        execute_at_writeback();
+    }
+
     // Every real instruction reaching WB retires, whether or not it writes a register
     // (stores, branches, jumps to x0, nops). Bubbles carry INVALID_PC.
     if (mem_wb_reg_.pc != INVALID_PC)
@@ -662,6 +666,135 @@ void RV5StageVM_Base::pipeline_writeback()
     }
 }
 
+bool RV5StageVM_Base::completes_at_writeback(uint32_t instruction)
+{
+    const uint32_t opcode = instruction & 0b1111111;
+    const uint32_t funct3 = (instruction >> 12) & 0b111;
+    return rvv::isVectorInstruction(instruction) || (opcode == 0b1110011 && funct3 != 0);
+}
+
+void RV5StageVM_Base::execute_at_writeback()
+{
+    const uint32_t instruction = mem_wb_reg_.instruction;
+    try
+    {
+        if (rvv::isVectorInstruction(instruction))
+        {
+            rvv::ExecutionContext context{registers_, memory_controller_, current_delta_};
+            rvv::execute(instruction, context);
+        }
+        else
+        {
+            writeback_csr(instruction);
+        }
+    }
+    catch (...)
+    {
+        // Report the error at the faulting instruction, as the single-cycle processor does.
+        program_counter_ = mem_wb_reg_.pc;
+        throw;
+    }
+}
+
+void RV5StageVM_Base::writeback_csr(uint32_t instruction)
+{
+    const unsigned rd = (instruction >> 7) & 0b11111;
+    const unsigned funct3 = (instruction >> 12) & 0b111;
+    const unsigned rs1 = (instruction >> 15) & 0b11111;
+    const uint16_t csr = (instruction >> 20) & 0xFFF;
+
+    // csrrw/csrrwi always write; csrrs/csrrc(i) write only when rs1/uimm is non-zero.
+    const bool writes = funct3 == 0b001 || funct3 == 0b101 || rs1 != 0;
+    if (writes && IsReadOnlyCsr(csr))
+    {
+        throw std::runtime_error("Illegal instruction '" + instruction_set::disassemble(instruction) +
+                                 "': write to a read-only CSR");
+    }
+
+    const uint64_t old_csr = registers_.ReadCsr(csr);
+    const uint64_t operand = (funct3 & 0b100) ? rs1 : registers_.ReadGpr(rs1);
+    uint64_t new_csr = old_csr;
+    switch (funct3 & 0b011)
+    {
+    case 0b01:
+        new_csr = operand;
+        break;
+    case 0b10:
+        new_csr = old_csr | operand;
+        break;
+    case 0b11:
+        new_csr = old_csr & ~operand;
+        break;
+    default:
+        break;
+    }
+
+    const uint64_t old_gpr = registers_.ReadGpr(rd);
+    if (writes)
+    {
+        registers_.WriteCsr(csr, new_csr);
+    }
+    registers_.WriteGpr(rd, old_csr);
+
+    const uint64_t written_gpr = registers_.ReadGpr(rd);
+    const uint64_t written_csr = registers_.ReadCsr(csr);
+    if (old_gpr != written_gpr)
+    {
+        current_delta_.register_changes.push_back({rd, 0, old_gpr, written_gpr});
+    }
+    if (old_csr != written_csr)
+    {
+        current_delta_.register_changes.push_back({csr, 1, old_csr, written_csr});
+    }
+}
+
+namespace
+{
+/// Scalar register written in WB by a vector or CSR instruction.
+struct ScalarDestination
+{
+    bool fpr = false;
+    unsigned reg = 0;
+};
+
+std::optional<ScalarDestination> scalar_destination(uint32_t instruction)
+{
+    const unsigned rd = (instruction >> 7) & 0b11111;
+    if (!rvv::isVectorInstruction(instruction))
+    {
+        // Zicsr: rd receives the old CSR value.
+        return rd != 0 ? std::optional<ScalarDestination>({false, rd}) : std::nullopt;
+    }
+    const rvv::InsnInfo *info = rvv::decode(instruction);
+    if (info == nullptr || !info->hasField(rvv::FieldBits::kRd))
+    {
+        return std::nullopt;
+    }
+    // vfmv.f.s is the only OPFVV instruction with a scalar destination; it writes an FPR.
+    const bool fpr = info->opcode == rvv::kOpcodeOpV && info->funct3 == rvv::kOpFVV;
+    if (!fpr && rd == 0)
+    {
+        return std::nullopt;
+    }
+    return ScalarDestination{fpr, rd};
+}
+
+bool is_scalar_fp_operation(uint32_t instruction)
+{
+    switch (instruction & 0b1111111)
+    {
+    case 0b1010011: // OP-FP
+    case 0b1000011: // FMADD
+    case 0b1000111: // FMSUB
+    case 0b1001011: // FNMSUB
+    case 0b1001111: // FNMADD
+        return true;
+    default:
+        return false;
+    }
+}
+} // namespace
+
 namespace
 {
 /// True if the instruction's register result goes to a GPR (F/D compares, conversions to
@@ -702,6 +835,49 @@ uint64_t RV5StageVM_Base::forwarded_fp_gpr_source(unsigned reg) const
         return ex_mem_reg_.alu_result;
     }
     return registers_.ReadGpr(reg);
+}
+
+bool RV5StageVM_Base::writeback_dependency_stall() const
+{
+    const uint32_t instruction = if_id_reg_.instruction;
+    if (if_id_reg_.pc == INVALID_PC || instruction == NOP || completes_at_writeback(instruction))
+    {
+        // Vector and CSR instructions read their scalar operands in WB, so they never wait.
+        return false;
+    }
+
+    const unsigned rs1 = (instruction >> 15) & 0b11111;
+    const unsigned rs2 = (instruction >> 20) & 0b11111;
+    const unsigned rs3 = (instruction >> 27) & 0b11111;
+    const bool reads_fpr = instruction_set::isFInstruction(instruction) ||
+                           instruction_set::isDInstruction(instruction);
+
+    auto blocks = [&](uint64_t pc, uint32_t older)
+    {
+        if (pc == INVALID_PC || !completes_at_writeback(older))
+        {
+            return false;
+        }
+        if (is_scalar_fp_operation(instruction))
+        {
+            return true;
+        }
+        const auto destination = scalar_destination(older);
+        if (!destination)
+        {
+            return false;
+        }
+        if (destination->fpr)
+        {
+            // Like the hazard unit, treat the rs fields of an F/D instruction as FPR sources.
+            return reads_fpr && (destination->reg == rs1 || destination->reg == rs2 ||
+                                 destination->reg == rs3);
+        }
+        return destination->reg == rs1 || destination->reg == rs2;
+    };
+
+    return blocks(ex_mem_reg_.pc, ex_mem_reg_.instruction) ||
+           blocks(mem_wb_reg_.pc, mem_wb_reg_.instruction);
 }
 
 void RV5StageVM_Base::pipeline_writeback_float()
@@ -921,6 +1097,11 @@ void RV5StageVM_Base::Undo()
         }
     }
 
+    for (const auto &change : last.vector_register_changes)
+    {
+        registers_.WriteVr(change.reg_index, change.old_bytes);
+    }
+
     for (auto it = last.memory_changes.rbegin(); it != last.memory_changes.rend(); ++it)
     {
         const auto &change = *it;
@@ -982,6 +1163,11 @@ void RV5StageVM_Base::Redo()
         default:
             break;
         }
+    }
+
+    for (const auto &change : next.vector_register_changes)
+    {
+        registers_.WriteVr(change.reg_index, change.new_bytes);
     }
 
     for (const auto &change : next.memory_changes)
