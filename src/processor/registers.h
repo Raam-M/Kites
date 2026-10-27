@@ -33,6 +33,9 @@ class RegisterFile : public QObject
 
     std::array<uint64_t, NUM_CSR> csr_ = {}; ///< Array for storing CSR values.
 
+    size_t vlenb_ = 16;          ///< Vector register length in bytes (VLEN / 8).
+    std::vector<uint8_t> vr_;    ///< Vector registers v0..v31, vlenb_ bytes each, element 0 first.
+
   public:
     /**
      * @brief Enum representing the type of a register.
@@ -83,6 +86,25 @@ class RegisterFile : public QObject
 
     void WriteCsr(size_t reg, uint64_t value);
 
+    /// Vector register length in bytes (VLEN / 8).
+    [[nodiscard]] size_t GetVlenb() const;
+
+    /**
+     * @brief Reads the bytes of one vector register (byte 0 holds the low bits of element 0).
+     * @param reg Vector register index (0..31).
+     */
+    [[nodiscard]] std::vector<uint8_t> ReadVr(size_t reg) const;
+
+    /**
+     * @brief Overwrites one vector register.
+     * @param reg Vector register index (0..31).
+     * @param bytes Exactly GetVlenb() bytes.
+     */
+    void WriteVr(size_t reg, const std::vector<uint8_t> &bytes);
+
+    /// All vector registers as one contiguous byte array (v0 first).
+    [[nodiscard]] const std::vector<uint8_t> &GetVrBytes() const;
+
     /**
      * @brief Retrieves the values of all General-Purpose Registers (GPR).
      * @return A vector containing the values of all GPRs.
@@ -100,6 +122,8 @@ class RegisterFile : public QObject
   signals:
     void updateRegister(size_t regIndex, uint64_t value);
     void updateFRegister(size_t regIndex, uint64_t value);
+    void updateVRegister(size_t regIndex);
+    void updateCsr(size_t address, uint64_t value);
     void registerResetSignal();
 };
 
@@ -108,6 +132,8 @@ extern const std::unordered_set<std::string> valid_general_purpose_registers;
 extern const std::unordered_set<std::string> valid_floating_point_registers;
 
 extern const std::unordered_set<std::string> valid_csr_registers;
+
+extern const std::unordered_set<std::string> valid_vector_registers;
 
 extern const std::unordered_map<std::string, int> csr_to_address;
 
@@ -121,5 +147,27 @@ bool IsValidGeneralPurposeRegister(const std::string &reg);
 bool IsValidFloatingPointRegister(const std::string &reg);
 
 bool IsValidCsr(const std::string &reg);
+
+bool IsValidVectorRegister(const std::string &reg);
+
+/// CSR addresses whose two top bits are 11 are read-only (RISC-V CSR address convention).
+inline bool IsReadOnlyCsr(size_t address)
+{
+    return ((address >> 10) & 0x3) == 0x3;
+}
+
+namespace csr_address
+{
+inline constexpr size_t kFflags = 0x001;
+inline constexpr size_t kFrm = 0x002;
+inline constexpr size_t kFcsr = 0x003;
+inline constexpr size_t kVstart = 0x008;
+inline constexpr size_t kVxsat = 0x009;
+inline constexpr size_t kVxrm = 0x00A;
+inline constexpr size_t kVcsr = 0x00F;
+inline constexpr size_t kVl = 0xC20;
+inline constexpr size_t kVtype = 0xC21;
+inline constexpr size_t kVlenb = 0xC22;
+} // namespace csr_address
 }//namespace Kites
 #endif // REGISTERS_H

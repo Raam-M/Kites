@@ -39,6 +39,7 @@ class RVSSProcessor : public ProcessorBase
     uint64_t return_address_{};
 
     bool branch_flag_ = false;
+    bool vector_instruction_ = false; ///< current instruction was handled by the vector unit
     int64_t next_pc_{}; // for jal, jalr,
 
     // CSR intermediate variables
@@ -57,6 +58,8 @@ class RVSSProcessor : public ProcessorBase
     void Decode();
 
     void Execute();
+    /// Executes a vector instruction atomically through the vector unit (rvv::execute).
+    void ExecuteVector();
     void ExecuteFloat();
     void ExecuteDouble();
     void ExecuteCsr();

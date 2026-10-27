@@ -5,6 +5,8 @@
  */
 
 #include "processor/rvss/rvss_processor.h"
+#include "processor/vector/vector_isa.h"
+#include "processor/vector/vector_unit.h"
 
 #include "common/instructions.h"
 #include "config/config.h"
@@ -170,13 +172,37 @@ void RVSSProcessor::Fetch()
 
 void RVSSProcessor::Decode()
 {
+    vector_instruction_ = rvv::isVectorInstruction(current_instruction_);
     control_unit_.SetControlSignals(current_instruction_);
+}
+
+void RVSSProcessor::ExecuteVector()
+{
+    rvv::ExecutionContext context{registers_, memory_controller_, current_delta_};
+    try
+    {
+        rvv::execute(current_instruction_, context);
+    }
+    catch (...)
+    {
+        // Leave the PC on the faulting instruction; no other state was modified.
+        UpdateProgramCounter(-4);
+        throw;
+    }
 }
 
 void RVSSProcessor::Execute()
 {
     uint8_t opcode = current_instruction_ & 0b1111111;
     uint8_t funct3 = (current_instruction_ >> 12) & 0b111;
+
+    if (vector_instruction_)
+    {
+        // Vector loads/stores share LOAD-FP/STORE-FP with flw/fld/fsw/fsd, so they must be
+        // routed here before the F/D checks.
+        ExecuteVector();
+        return;
+    }
 
     if (opcode == 0b1110011 && funct3 == 0b000)
     {
@@ -396,6 +422,16 @@ void RVSSProcessor::ExecuteCsr()
 {
     uint8_t rs1 = (current_instruction_ >> 15) & 0b11111;
     uint16_t csr = (current_instruction_ >> 20) & 0xFFF;
+    const uint8_t csr_funct3 = (current_instruction_ >> 12) & 0b111;
+    // csrrw/csrrwi always write; csrrs/csrrc(i) write only when rs1/uimm is non-zero.
+    const bool writes = csr_funct3 == 0b001 || csr_funct3 == 0b101 || rs1 != 0;
+    if (writes && IsReadOnlyCsr(csr))
+    {
+        UpdateProgramCounter(-4);
+        throw std::runtime_error("Illegal instruction '" +
+                                 instruction_set::disassemble(current_instruction_) +
+                                 "': write to a read-only CSR");
+    }
     uint64_t csr_val = registers_.ReadCsr(csr);
 
     csr_target_address_ = csr;
@@ -621,7 +657,7 @@ void RVSSProcessor::WriteMemory()
     uint8_t rs2 = (current_instruction_ >> 20) & 0b11111;
     uint8_t funct3 = (current_instruction_ >> 12) & 0b111;
 
-    if (opcode == 0b1110011 && funct3 == 0b000)
+    if (vector_instruction_ || (opcode == 0b1110011 && funct3 == 0b000))
     {
         return;
     }
@@ -826,7 +862,7 @@ void RVSSProcessor::WriteBack()
     uint8_t rd = (current_instruction_ >> 7) & 0b11111;
     int32_t imm = ImmGenerator(current_instruction_);
 
-    if (opcode == 0b1110011 && funct3 == 0b000)
+    if (vector_instruction_ || (opcode == 0b1110011 && funct3 == 0b000))
     {
         return;
     }
@@ -1230,6 +1266,11 @@ void RVSSProcessor::Undo()
         }
     }
 
+    for (const auto &change : last.vector_register_changes)
+    {
+        registers_.WriteVr(change.reg_index, change.old_bytes);
+    }
+
     for (const auto &change : last.memory_changes)
     {
         for (size_t i = 0; i < change.old_bytes_vec.size(); ++i)
@@ -1302,6 +1343,11 @@ void RVSSProcessor::Redo()
         }
     }
 
+    for (const auto &change : next.vector_register_changes)
+    {
+        registers_.WriteVr(change.reg_index, change.new_bytes);
+    }
+
     for (const auto &change : next.memory_changes)
     {
         for (size_t i = 0; i < change.new_bytes_vec.size(); ++i)
@@ -1345,6 +1391,8 @@ void RVSSProcessor::Reset()
     csr_uimm_ = 0;
     current_delta_.register_changes.clear();
     current_delta_.memory_changes.clear();
+    current_delta_.vector_register_changes.clear();
+    vector_instruction_ = false;
     current_delta_.old_pc = 0;
     current_delta_.new_pc = 0;
     undo_stack_ = std::stack<StepDelta>();

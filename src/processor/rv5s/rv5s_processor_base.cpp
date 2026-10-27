@@ -1,6 +1,7 @@
 #include "common/debug_colors.h"
 #include "common/instructions.h"
 #include "processor/rv5s/rv5s_processor_base.h"
+#include "processor/vector/vector_isa.h"
 #include <thread>
 
 namespace Kites
@@ -168,6 +169,12 @@ void RV5StageVM_Base::setProcessorState()
 void RV5StageVM_Base::pipeline_decode()
 {
     uint32_t instruction = if_id_reg_.instruction;
+    if (rvv::isVectorInstruction(instruction))
+    {
+        throw std::runtime_error("Vector instruction '" + instruction_set::disassemble(instruction) +
+                                 "': vector instructions are supported only on the single-cycle "
+                                 "processor");
+    }
     if (instruction == NOP)
     {
         // Pass through fields as needed

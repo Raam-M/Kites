@@ -6,6 +6,7 @@
 
 #include "processor/rvss/rvss_control_unit.h"
 #include "processor/alu.h"
+#include "processor/vector/vector_isa.h"
 
 #include <cstdint>
 
@@ -17,6 +18,12 @@ void RVSSControlUnit::SetControlSignals(uint32_t instruction)
 
     alu_src_ = mem_to_reg_ = reg_write_ = mem_read_ = mem_write_ = branch_ = false;
     alu_op_ = false;
+
+    // Vector instructions are executed by the vector unit and use no scalar datapath signals.
+    if (rvv::isVectorInstruction(instruction))
+    {
+        return;
+    }
 
     switch (opcode)
     {

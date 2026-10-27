@@ -53,6 +53,14 @@ struct RegisterChange
     uint64_t new_value;
 };
 
+/// Old and new contents of one vector register changed by a step (VLEN/8 bytes each).
+struct VectorRegisterChange
+{
+    unsigned int reg_index;
+    std::vector<uint8_t> old_bytes;
+    std::vector<uint8_t> new_bytes;
+};
+
 struct MemoryChange
 {
     uint64_t address;
@@ -74,6 +82,7 @@ struct StepDelta
     unsigned int new_branch_mispredictions{};
     std::vector<RegisterChange> register_changes{};
     std::vector<MemoryChange> memory_changes{};
+    std::vector<VectorRegisterChange> vector_register_changes{};
 };
 
 /**

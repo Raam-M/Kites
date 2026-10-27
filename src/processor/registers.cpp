@@ -5,7 +5,10 @@
  */
 
 #include "processor/registers.h"
+#include "processor/vector/vector_config.h"
+#include "processor/vector/vtype.h"
 #include <QDebug>
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <stdexcept>
@@ -17,6 +20,10 @@ namespace Kites
 {
 RegisterFile::RegisterFile(QObject *parent) : QObject(parent)
 {
+    vlenb_ = rvv::config().vlen / 8;
+    vr_.assign(rvv::kNumVectorRegisters * vlenb_, 0);
+    csr_[csr_address::kVtype] = rvv::kVillBit;
+    csr_[csr_address::kVlenb] = vlenb_;
 }
 
 void RegisterFile::Reset()
@@ -25,6 +32,13 @@ void RegisterFile::Reset()
     fpr_.fill(0.0);
     csr_.fill(0);
     csr_[0x002] = 0b000; // Default: RNE (IEEE 754)
+
+    // Vector state: vtype.vill = 1 and vl = 0, as the RVV spec recommends for reset.
+    vlenb_ = rvv::config().vlen / 8;
+    vr_.assign(rvv::kNumVectorRegisters * vlenb_, 0);
+    csr_[csr_address::kVtype] = rvv::kVillBit;
+    csr_[csr_address::kVl] = 0;
+    csr_[csr_address::kVlenb] = vlenb_;
     emit registerResetSignal();
 }
 
@@ -67,6 +81,11 @@ uint64_t RegisterFile::ReadCsr(size_t reg) const
 {
     if (reg >= NUM_CSR)
         throw std::out_of_range("Invalid CSR index");
+    if (reg == csr_address::kVcsr)
+    {
+        // vcsr is a view of vxrm (bits 2:1) and vxsat (bit 0).
+        return ((csr_[csr_address::kVxrm] & 0x3) << 1) | (csr_[csr_address::kVxsat] & 0x1);
+    }
     return csr_[reg];
 }
 
@@ -74,7 +93,51 @@ void RegisterFile::WriteCsr(size_t reg, uint64_t value)
 {
     if (reg >= NUM_CSR)
         throw std::out_of_range("Invalid CSR index");
-    csr_[reg] = value;
+    switch (reg)
+    {
+    case csr_address::kVcsr:
+        csr_[csr_address::kVxrm] = (value >> 1) & 0x3;
+        csr_[csr_address::kVxsat] = value & 0x1;
+        break;
+    case csr_address::kVxrm:
+        csr_[reg] = value & 0x3;
+        break;
+    case csr_address::kVxsat:
+        csr_[reg] = value & 0x1;
+        break;
+    default:
+        csr_[reg] = value;
+        break;
+    }
+    emit updateCsr(reg, ReadCsr(reg));
+}
+
+size_t RegisterFile::GetVlenb() const
+{
+    return vlenb_;
+}
+
+std::vector<uint8_t> RegisterFile::ReadVr(size_t reg) const
+{
+    if (reg >= rvv::kNumVectorRegisters || vr_.empty())
+        throw std::out_of_range("Invalid vector register index");
+    auto first = vr_.begin() + static_cast<std::ptrdiff_t>(reg * vlenb_);
+    return {first, first + static_cast<std::ptrdiff_t>(vlenb_)};
+}
+
+void RegisterFile::WriteVr(size_t reg, const std::vector<uint8_t> &bytes)
+{
+    if (reg >= rvv::kNumVectorRegisters || vr_.empty())
+        throw std::out_of_range("Invalid vector register index");
+    if (bytes.size() != vlenb_)
+        throw std::invalid_argument("Vector register write has the wrong size");
+    std::copy(bytes.begin(), bytes.end(), vr_.begin() + static_cast<std::ptrdiff_t>(reg * vlenb_));
+    emit updateVRegister(reg);
+}
+
+const std::vector<uint8_t> &RegisterFile::GetVrBytes() const
+{
+    return vr_;
 }
 
 std::vector<uint64_t> RegisterFile::GetGprValues() const
@@ -130,12 +193,18 @@ const std::unordered_set<std::string> valid_floating_point_registers = {
     "ft24", "ft25", "ft26", "ft27", "ft28", "ft29", "ft30", "ft31",
 };
 
-const std::unordered_set<std::string> valid_csr_registers = {"fflags", "frm", "fcsr"};
+const std::unordered_set<std::string> valid_csr_registers = {
+    "fflags", "frm", "fcsr", "vstart", "vxsat", "vxrm", "vcsr", "vl", "vtype", "vlenb"};
 
 const std::unordered_map<std::string, int> csr_to_address{
-    {"fflags", 0x001},
-    {"frm", 0x002},
-    {"fcsr", 0x003},
+    {"fflags", 0x001}, {"frm", 0x002},   {"fcsr", 0x003},  {"vstart", 0x008}, {"vxsat", 0x009},
+    {"vxrm", 0x00A},   {"vcsr", 0x00F},  {"vl", 0xC20},    {"vtype", 0xC21},  {"vlenb", 0xC22},
+};
+
+const std::unordered_set<std::string> valid_vector_registers = {
+    "v0",  "v1",  "v2",  "v3",  "v4",  "v5",  "v6",  "v7",  "v8",  "v9",  "v10",
+    "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21",
+    "v22", "v23", "v24", "v25", "v26", "v27", "v28", "v29", "v30", "v31",
 };
 
 const std::unordered_map<std::string, std::string> reg_alias_to_name = {
@@ -171,7 +240,9 @@ const std::unordered_map<std::string, std::string> reg_alias_to_name = {
     {"f25", "f25"},       {"f26", "f26"},  {"f27", "f27"},   {"f28", "f28"}, {"f29", "f29"},
     {"f30", "f30"},       {"f31", "f31"},
 
-    {"fflags", "fflags"}, {"frm", "frm"},  {"fcsr", "fcsr"},
+    {"fflags", "fflags"}, {"frm", "frm"},  {"fcsr", "fcsr"},   {"vstart", "vstart"},
+    {"vxsat", "vxsat"},   {"vxrm", "vxrm"}, {"vcsr", "vcsr"},   {"vl", "vl"},
+    {"vtype", "vtype"},   {"vlenb", "vlenb"},
 
 };
 
@@ -188,5 +259,10 @@ bool IsValidFloatingPointRegister(const std::string &reg)
 bool IsValidCsr(const std::string &reg)
 {
     return valid_csr_registers.find(reg) != valid_csr_registers.end();
+}
+
+bool IsValidVectorRegister(const std::string &reg)
+{
+    return valid_vector_registers.find(reg) != valid_vector_registers.end();
 }
 }//namespace Kites
