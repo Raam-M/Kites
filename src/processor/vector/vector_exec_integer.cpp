@@ -295,6 +295,47 @@ u64 ssra(ExecState &s, u64 a, u64 b, unsigned sew)
         roundShiftSigned(sx(a, sew), static_cast<unsigned>(b & (sew - 1)), roundingMode(s)));
 }
 
+// ------------------------------------------------------------------ Zvkb / Zvbb / Zvbc
+
+u64 andnOp(ExecState &, u64 a, u64 b, unsigned) { return a & ~b; }
+
+u64 rotateLeft(u64 v, unsigned amount, unsigned sew)
+{
+    v &= maskBits(sew);
+    amount &= sew - 1;
+    return amount == 0 ? v : ((v << amount) | (v >> (sew - amount))) & maskBits(sew);
+}
+
+u64 rolOp(ExecState &, u64 a, u64 b, unsigned sew)
+{
+    return rotateLeft(a, static_cast<unsigned>(b & (sew - 1)), sew);
+}
+
+u64 rorOp(ExecState &, u64 a, u64 b, unsigned sew)
+{
+    return rotateLeft(a, static_cast<unsigned>((sew - (b & (sew - 1))) & (sew - 1)), sew);
+}
+
+/// Low 64 bits of the carry-less product.
+u64 clmulOp(ExecState &, u64 a, u64 b, unsigned)
+{
+    u64 r = 0;
+    for (unsigned i = 0; i < 64; ++i)
+        if (((b >> i) & 1U) != 0)
+            r ^= a << i;
+    return r;
+}
+
+/// High 64 bits of the carry-less product.
+u64 clmulhOp(ExecState &, u64 a, u64 b, unsigned)
+{
+    u64 r = 0;
+    for (unsigned i = 1; i < 64; ++i)
+        if (((b >> i) & 1U) != 0)
+            r ^= a >> (64 - i);
+    return r;
+}
+
 const std::unordered_map<std::string, BinaryOp> &binaryOps()
 {
     static const std::unordered_map<std::string, BinaryOp> ops = {
@@ -306,6 +347,8 @@ const std::unordered_map<std::string, BinaryOp> &binaryOps()
         {"vrem", remOp},     {"vsaddu", saddu},   {"vsadd", sadd},     {"vssubu", ssubu},
         {"vssub", ssub},     {"vaaddu", aaddu},   {"vaadd", aadd},     {"vasubu", asubu},
         {"vasub", asub},     {"vsmul", smul},     {"vssrl", ssrl},     {"vssra", ssra},
+        {"vandn", andnOp},   {"vrol", rolOp},     {"vror", rorOp},     {"vclmul", clmulOp},
+        {"vclmulh", clmulhOp},
     };
     return ops;
 }
@@ -314,6 +357,15 @@ void singleWidth(ExecState &s)
 {
     s.requireVtype();
     const BinaryOp op = binaryOps().at(s.info.base);
+    if (s.info.base == "vclmul" || s.info.base == "vclmulh")
+    {
+        s.require(s.sew == 64, s.info.base + " requires SEW = 64");
+    }
+    if (s.sew == 64 && (s.info.base.rfind("vmulh", 0) == 0 || s.info.base == "vsmul"))
+    {
+        s.require(config().supportsMulHigh64(), s.info.base + " with SEW = 64 is not part of " +
+                                                    profileName(config().profile));
+    }
     const Group d = s.group(s.vd(), s.sew);
     s.checkGroup(d, "vd");
     s.checkGroup(s.group(s.vs2(), s.sew), "vs2");
@@ -429,6 +481,8 @@ const std::unordered_map<std::string, WideOp> &wideOps()
          { return d + static_cast<u64>(sx(b, sew) * static_cast<i64>(a)); }},
         {"vwmaccus", [](u64 a, u64 b, u64 d, unsigned sew, bool)
          { return d + static_cast<u64>(static_cast<i64>(b) * sx(a, sew)); }},
+        // Zvbb: zero-extended vs2 shifted left by the low log2(2*SEW) bits of the operand.
+        {"vwsll", [](u64 a, u64 b, u64, unsigned sew, bool) { return a << (b & (2 * sew - 1)); }},
     };
     return ops;
 }
@@ -436,7 +490,7 @@ const std::unordered_map<std::string, WideOp> &wideOps()
 void widening(ExecState &s)
 {
     s.requireVtype();
-    s.require(2 * s.sew <= kElen, "widening requires 2*SEW <= ELEN");
+    s.require(2 * s.sew <= config().elen(), "widening requires 2*SEW <= ELEN");
     const WideOp op = wideOps().at(s.info.base);
     const bool wideA = !s.info.suffix.empty() && s.info.suffix[0] == 'w';
     const bool accumulate = s.info.base.rfind("vwmacc", 0) == 0;
@@ -467,12 +521,80 @@ void widening(ExecState &s)
     s.tail(d);
 }
 
+// ------------------------------------------------------------------ Zvbb unary bit operations
+
+u64 reverseBits(u64 v, unsigned width)
+{
+    u64 r = 0;
+    for (unsigned i = 0; i < width; ++i)
+        r |= ((v >> i) & 1U) << (width - 1 - i);
+    return r;
+}
+
+u64 bitUnaryOp(const InsnInfo &info, u64 a, unsigned sew)
+{
+    const std::string &base = info.base;
+    a &= maskBits(sew);
+    if (base == "vbrev")
+        return reverseBits(a, sew);
+    if (base == "vbrev8" || base == "vrev8")
+    {
+        u64 r = 0;
+        for (unsigned byte = 0; byte < sew / 8; ++byte)
+        {
+            const u64 b = (a >> (8 * byte)) & 0xFFU;
+            if (base == "vbrev8")
+                r |= reverseBits(b, 8) << (8 * byte);
+            else
+                r |= b << (8 * (sew / 8 - 1 - byte));
+        }
+        return r;
+    }
+    if (base == "vclz")
+    {
+        unsigned n = 0;
+        for (unsigned i = sew; i-- > 0 && ((a >> i) & 1U) == 0;)
+            ++n;
+        return n;
+    }
+    if (base == "vctz")
+    {
+        unsigned n = 0;
+        for (unsigned i = 0; i < sew && ((a >> i) & 1U) == 0; ++i)
+            ++n;
+        return n;
+    }
+    u64 n = 0; // vcpop.v
+    for (; a != 0; a &= a - 1)
+        ++n;
+    return n;
+}
+
+void bitUnary(ExecState &s)
+{
+    s.requireVtype();
+    const Group d = s.group(s.vd(), s.sew);
+    s.checkGroup(d, "vd");
+    s.checkGroup(s.group(s.vs2(), s.sew), "vs2");
+    s.checkMaskOverlap(d);
+    for (u64 i = s.vstart; i < s.vl; ++i)
+    {
+        if (!s.active(i))
+        {
+            s.inactive(d, i);
+            continue;
+        }
+        s.write(d.reg, i, s.sew, bitUnaryOp(s.info, s.read(s.vs2(), i, s.sew), s.sew));
+    }
+    s.tail(d);
+}
+
 // ------------------------------------------------------------------ narrowing
 
 void narrowing(ExecState &s)
 {
     s.requireVtype();
-    s.require(2 * s.sew <= kElen, "narrowing requires 2*SEW <= ELEN");
+    s.require(2 * s.sew <= config().elen(), "narrowing requires 2*SEW <= ELEN");
     const unsigned wide = 2 * s.sew;
     const Group d = s.group(s.vd(), s.sew);
     s.checkGroup(d, "vd");
@@ -678,7 +800,7 @@ void reduction(ExecState &s)
     const std::string &base = s.info.base;
     const bool widen = base == "vwredsumu" || base == "vwredsum";
     const unsigned accEew = widen ? 2 * s.sew : s.sew;
-    s.require(accEew <= kElen, "widening reduction requires 2*SEW <= ELEN");
+    s.require(accEew <= config().elen(), "widening reduction requires 2*SEW <= ELEN");
     s.checkGroup(s.group(s.vs2(), s.sew), "vs2");
     if (s.vl == 0)
     {
@@ -1025,6 +1147,8 @@ const std::unordered_map<std::string, Handler> &handlers()
         h.emplace("vrgather", gather);
         h.emplace("vrgatherei16", gather);
         h.emplace("vcompress", compress);
+        for (const char *name : {"vbrev", "vbrev8", "vrev8", "vclz", "vctz"})
+            h.emplace(name, bitUnary);
         return h;
     }();
     return table;
@@ -1032,6 +1156,8 @@ const std::unordered_map<std::string, Handler> &handlers()
 
 Handler findHandler(const InsnInfo &info)
 {
+    if (info.base == "vcpop" && info.suffix == "v") // Zvbb element popcount, not vcpop.m
+        return bitUnary;
     if (info.base == "vmv")
     {
         return (info.suffix == "x.s" || info.suffix == "s.x") ? scalarMove : mergeMove;

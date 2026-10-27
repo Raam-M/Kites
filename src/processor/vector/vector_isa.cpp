@@ -25,11 +25,12 @@ struct RawEntry
     uint32_t match;
     uint32_t mask;
     uint32_t fields;
+    Extension extension;
 };
 
 // Encodings generated from riscv-opcodes; see tools/vector/gen_vector_isa.py.
 constexpr RawEntry kRawEntries[] = {
-#define KITES_RVV_INSN(name, match, mask, fields) {name, match, mask, fields},
+#define KITES_RVV_INSN(name, match, mask, fields, ext) {name, match, mask, fields, ext},
 #include "processor/vector/vector_isa_table.inc"
 #undef KITES_RVV_INSN
 };
@@ -151,6 +152,8 @@ std::vector<Operand> buildOperands(const InsnInfo &in)
             src1 = {OperandKind::Immediate, kSimm5};
         else if (in.hasField(kZimm5))
             src1 = {OperandKind::Immediate, kZimm5};
+        else if (in.hasField(kZimm6))
+            src1 = {OperandKind::Immediate, kZimm6};
         else if (!in.hasField(kVs1))
             hasSrc1 = false;
 
@@ -214,6 +217,7 @@ const Tables &tables()
             if (!segmentable)
             {
                 built.entries.push_back(makeInfo(raw.name, raw.match, raw.mask, raw.fields));
+                built.entries.back().extension = raw.extension;
                 continue;
             }
             // nf = 0 is the plain form; nf = k-1 is the NFIELDS = k segment form.
@@ -295,6 +299,8 @@ const InsnInfo *decode(uint32_t word)
 
 uint32_t getField(uint32_t word, uint32_t field)
 {
+    if (field == kZimm6)
+        return ((word >> 15) & 0x1FU) | (((word >> 26) & 1U) << 5);
     const FieldPosition &p = position(field);
     const uint32_t width = p.hi - p.lo + 1;
     return (word >> p.lo) & ((1U << width) - 1U);
@@ -302,6 +308,9 @@ uint32_t getField(uint32_t word, uint32_t field)
 
 uint32_t setField(uint32_t word, uint32_t field, uint32_t value)
 {
+    if (field == kZimm6)
+        return (word & ~((0x1FU << 15) | (1U << 26))) | ((value & 0x1FU) << 15) |
+               (((value >> 5) & 1U) << 26);
     const FieldPosition &p = position(field);
     const uint32_t width = p.hi - p.lo + 1;
     const uint32_t bits = ((1U << width) - 1U) << p.lo;
@@ -388,7 +397,7 @@ std::string expectedSyntax(const InsnInfo &info)
             append("(rs1)");
             break;
         case OperandKind::Immediate:
-            append(op.field == kSimm5 ? "simm5" : "uimm5");
+            append(op.field == kSimm5 ? "simm5" : op.field == kZimm6 ? "uimm6" : "uimm5");
             break;
         case OperandKind::VtypeImmediate:
             append("e<sew>, m<lmul>[, ta|tu][, ma|mu]");
@@ -461,10 +470,31 @@ void immediateRange(const InsnInfo &info, uint32_t field, int64_t &min, int64_t 
         min = -16;
         max = 15;
     }
+    else if (field == kZimm6)
+    {
+        min = 0;
+        max = 63;
+    }
     else
     {
         min = 0;
         max = 31;
+    }
+}
+
+std::string extensionName(Extension extension)
+{
+    switch (extension)
+    {
+    case kExtZvkb:
+        return "Zvkb";
+    case kExtZvbb:
+        return "Zvbb";
+    case kExtZvbc:
+        return "Zvbc";
+    case kExtV:
+    default:
+        return "V";
     }
 }
 

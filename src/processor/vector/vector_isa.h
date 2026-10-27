@@ -35,6 +35,16 @@ enum FieldBits : uint32_t
     kZimm5 = 1U << 10,  ///< bits 19..15, zero-extended immediate
     kZimm10 = 1U << 11, ///< bits 29..20, vsetivli vtype immediate
     kZimm11 = 1U << 12, ///< bits 30..20, vsetvli vtype immediate
+    kZimm6 = 1U << 13,  ///< bits 26 and 19..15, vror.vi rotate amount (Zvkb)
+};
+
+/// Extension that defines an instruction.
+enum Extension : uint8_t
+{
+    kExtV,    ///< base V (or the Zve* subsets)
+    kExtZvkb, ///< Zvkb, also part of Zvbb
+    kExtZvbb, ///< Zvbb only
+    kExtZvbc, ///< Zvbc
 };
 
 /// Kind of an assembly operand.
@@ -89,6 +99,7 @@ struct InsnInfo
     uint32_t opcode = 0;  ///< major opcode (bits 6..0)
     uint32_t funct3 = 0;  ///< bits 14..12 (OP-V category or memory width)
     unsigned nfields = 1; ///< segment field count (NFIELDS) for loads/stores
+    Extension extension = kExtV;
 
     [[nodiscard]] bool isConfig() const { return opcode == kOpcodeOpV && funct3 == kOpCfg; }
     [[nodiscard]] bool isLoad() const { return opcode == kOpcodeLoadFp; }
@@ -96,7 +107,11 @@ struct InsnInfo
     [[nodiscard]] bool hasField(uint32_t f) const { return (fields & f) != 0; }
 };
 
-/// All vector instructions: the 375 base encodings plus the 252 segment variants.
+/// Name of an extension, e.g. "Zvbb".
+std::string extensionName(Extension extension);
+
+/// All vector instructions: the 395 base encodings (V, Zvbb, Zvbc) plus the 252 segment
+/// variants.
 const std::vector<InsnInfo> &instructionTable();
 
 /// Looks up an instruction by mnemonic; nullptr if it is not a vector mnemonic.

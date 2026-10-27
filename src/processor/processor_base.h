@@ -14,6 +14,7 @@
 #include "ui/processor_tab/circuit_scene.h"
 #include "processor/processor_constants.h"
 #include "common/undo_buffer.h"
+#include "processor/vector/vector_profiler.h"
 #include <QList>
 #include <QMap>
 #include <QMutex>
@@ -83,6 +84,10 @@ struct StepDelta
     std::vector<RegisterChange> register_changes{};
     std::vector<MemoryChange> memory_changes{};
     std::vector<VectorRegisterChange> vector_register_changes{};
+    /// Vector profiler state before and after this step (set only when a vector instruction
+    /// ran), so undo and redo restore the statistics and timing estimate.
+    std::shared_ptr<const rvv::ProfilerState> vector_profile_before{};
+    std::shared_ptr<const rvv::ProfilerState> vector_profile_after{};
 };
 
 /**
@@ -127,6 +132,8 @@ class ProcessorBase : public QObject
     double ipc_{};
     unsigned int stall_cycles_{};
     unsigned int branch_mispredictions_{};
+    /// Vector instruction statistics and timing estimate (reset with the processor).
+    rvv::VectorProfiler vector_profiler_{};
 
     std::string output_status_;
 
@@ -137,6 +144,9 @@ class ProcessorBase : public QObject
 
     QList<QString> active_wires_{};
     size_t always_active_wires_count_{};
+    /// Adds the circuit-view wires of the vector unit used by a vector instruction (see
+    /// tools/vector/add_vector_unit_to_circuits.py); fromPipelineRegister adds MEM/WB -> unit.
+    void appendVectorUnitWires(uint32_t instruction, bool fromPipelineRegister);
     // the list of wire that will be active in this cycle of vm
     // well send this to the gui to highlight those wires
 

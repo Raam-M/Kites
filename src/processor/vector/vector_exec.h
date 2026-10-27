@@ -100,6 +100,11 @@ class ExecState
     uint32_t fflags = 0;
     std::vector<PendingStore> stores;
 
+    // ---- profiling (see vector_profiler.h)
+    mutable uint32_t registersRead = 0; ///< bit r: vector register r was read
+    uint32_t registersWritten = 0;      ///< bit r: vector register r was written
+    uint64_t bytesLoaded = 0;
+
     // ---- instruction fields
     [[nodiscard]] unsigned field(uint32_t f) const { return getField(word, f); }
     [[nodiscard]] unsigned vd() const { return field(kVd); }

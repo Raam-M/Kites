@@ -57,6 +57,7 @@ public:
     MemoryController *getMemoryController() const;
     CircuitScene *getCircuitScene() const;
     const Profiler* getProfiler() const;
+    const rvv::VectorProfiler *getVectorProfiler() const;
 
     // gui calls these functions to get the current state of the vm
     // maybe instead we should bundle the stats in a struct and the return just 

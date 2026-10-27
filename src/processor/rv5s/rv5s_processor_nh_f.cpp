@@ -9,6 +9,7 @@
  */
 #include "processor/rv5s/rv5s_processor_nh_f.h"
 #include "common/instructions.h"
+#include "processor/vector/vector_isa.h"
 #include "config/config.h"
 #include "ui/processor_tab/processor_designs/rv5s_processor_nh_f_circuit_scene.h"
 #include "processor/alu.h"
@@ -162,6 +163,11 @@ void RV5StageProcessorNHF::SetActiveWireNames()
     else
     {
         active_wires_.append("ALU1_to_PCMuxUp");
+    }
+    // A vector instruction in MEM/WB executes in WB next cycle (see pipeline_writeback).
+    if (mem_wb_reg_.pc != INVALID_PC && rvv::isVectorInstruction(mem_wb_reg_.instruction))
+    {
+        appendVectorUnitWires(mem_wb_reg_.instruction, true);
     }
 }
 

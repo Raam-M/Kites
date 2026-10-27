@@ -280,6 +280,11 @@ ProcessorType ProcessorManager::getProcessorType()
     return m_currentProcessorType;
 }
 
+const rvv::VectorProfiler *ProcessorManager::getVectorProfiler() const
+{
+    return &m_currentProcessor->vector_profiler_;
+}
+
 const Profiler* ProcessorManager::getProfiler() const
 {
     return &m_profiler;

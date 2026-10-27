@@ -9,6 +9,7 @@
  */
 #include "processor/rv5s/rv5s_processor_h_nf.h"
 #include "common/instructions.h"
+#include "processor/vector/vector_isa.h"
 #include "config/config.h"
 #include "ui/processor_tab/processor_designs/rv5s_processor_h_nf_circuit_scene.h"
 #include "processor/alu.h"
@@ -136,6 +137,11 @@ void RV5StageProcessorHNF::SetActiveWireNames()
     active_wires_ = uniqueList;
 
     // The scene will read `active_wires_` when `updateCircuitStateSignal` is emitted by callers.
+    // A vector instruction in MEM/WB executes in WB next cycle (see pipeline_writeback).
+    if (mem_wb_reg_.pc != INVALID_PC && rvv::isVectorInstruction(mem_wb_reg_.instruction))
+    {
+        appendVectorUnitWires(mem_wb_reg_.instruction, true);
+    }
 }
 
 void RV5StageProcessorHNF::Reset()

@@ -1247,3 +1247,49 @@ vwmaccus.vx v8, a1, v16|0xfb05e457
 vwmaccus.vx v8, a1, v16, v0.t|0xf905e457
 vwmaccsu.vx v8, a1, v16|0xff05e457
 vwmaccsu.vx v8, a1, v16, v0.t|0xfd05e457
+vandn.vv v8, v16, v24|0x070c0457
+vandn.vv v8, v16, v24, v0.t|0x050c0457
+vandn.vx v8, v16, a1|0x0705c457
+vandn.vx v8, v16, a1, v0.t|0x0505c457
+vbrev.v v8, v16|0x4b052457
+vbrev.v v8, v16, v0.t|0x49052457
+vbrev8.v v8, v16|0x4b042457
+vbrev8.v v8, v16, v0.t|0x49042457
+vrev8.v v8, v16|0x4b04a457
+vrev8.v v8, v16, v0.t|0x4904a457
+vclz.v v8, v16|0x4b062457
+vclz.v v8, v16, v0.t|0x49062457
+vctz.v v8, v16|0x4b06a457
+vctz.v v8, v16, v0.t|0x4906a457
+vcpop.v v8, v16|0x4b072457
+vcpop.v v8, v16, v0.t|0x49072457
+vrol.vv v8, v16, v24|0x570c0457
+vrol.vv v8, v16, v24, v0.t|0x550c0457
+vrol.vx v8, v16, a1|0x5705c457
+vrol.vx v8, v16, a1, v0.t|0x5505c457
+vror.vv v8, v16, v24|0x530c0457
+vror.vv v8, v16, v24, v0.t|0x510c0457
+vror.vx v8, v16, a1|0x5305c457
+vror.vx v8, v16, a1, v0.t|0x5105c457
+vror.vi v8, v16, 0|0x53003457
+vror.vi v8, v16, 0, v0.t|0x51003457
+vror.vi v8, v16, 33|0x5700b457
+vror.vi v8, v16, 33, v0.t|0x5500b457
+vror.vi v8, v16, 63|0x570fb457
+vror.vi v8, v16, 63, v0.t|0x550fb457
+vwsll.vv v8, v16, v24|0xd70c0457
+vwsll.vv v8, v16, v24, v0.t|0xd50c0457
+vwsll.vx v8, v16, a1|0xd705c457
+vwsll.vx v8, v16, a1, v0.t|0xd505c457
+vwsll.vi v8, v16, 0|0xd7003457
+vwsll.vi v8, v16, 0, v0.t|0xd5003457
+vwsll.vi v8, v16, 31|0xd70fb457
+vwsll.vi v8, v16, 31, v0.t|0xd50fb457
+vclmul.vv v8, v16, v24|0x330c2457
+vclmul.vv v8, v16, v24, v0.t|0x310c2457
+vclmul.vx v8, v16, a1|0x3305e457
+vclmul.vx v8, v16, a1, v0.t|0x3105e457
+vclmulh.vv v8, v16, v24|0x370c2457
+vclmulh.vv v8, v16, v24, v0.t|0x350c2457
+vclmulh.vx v8, v16, a1|0x3705e457
+vclmulh.vx v8, v16, a1, v0.t|0x3505e457

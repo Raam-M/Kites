@@ -22,6 +22,8 @@ struct StepDelta;
 namespace rvv
 {
 
+class VectorProfiler;
+
 struct InsnInfo;
 
 /// Raised for illegal or reserved vector usage. Architectural state is left unchanged.
@@ -43,7 +45,9 @@ struct ExecutionContext
 {
     RegisterFile &registers;
     MemoryController &memory;
-    StepDelta &delta; ///< receives a record of every change
+    StepDelta &delta;                   ///< receives a record of every change
+    VectorProfiler *profiler = nullptr; ///< optional: statistics and timing model
+    uint64_t cycle = 0;                 ///< processor cycle, for the timing model
 };
 
 /**

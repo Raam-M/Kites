@@ -43,6 +43,7 @@ std::string hexAddress(u64 address)
 bool loadElement(ExecState &s, u64 address, unsigned bytes, u64 &value)
 {
     MemoryController &mem = s.context.memory;
+    s.bytesLoaded += bytes;
     if (address + bytes < address)
     {
         return false;
@@ -158,6 +159,8 @@ void executeMemory(ExecState &s)
     const unsigned lumop = (s.word >> 20) & 31U;
     const unsigned eew = widthToEew(s.info.funct3);
     const bool load = s.info.isLoad();
+    s.require(eew <= config().elen(),
+              "EEW = " + std::to_string(eew) + " exceeds ELEN = " + std::to_string(config().elen()));
 
     if (mop == 0 && lumop == kLumopWholeRegister)
     {

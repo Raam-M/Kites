@@ -1,6 +1,7 @@
 /**
  * @file vector_exec_float.cpp
- * @brief Floating-point vector instructions (OPFVV / OPFVF) for SEW = 32 (F) and SEW = 64 (D).
+ * @brief Floating-point vector instructions (OPFVV / OPFVF) for SEW = 16 (Zvfh), SEW = 32 (F)
+ * and SEW = 64 (D).
  *
  * Element arithmetic uses the host's IEEE 754 operations with the rounding mode taken from frm,
  * and the host exception flags are accrued into fflags using the RISC-V bit layout. RISC-V rules
@@ -8,18 +9,26 @@
  * minimumNumber/maximumNumber for min/max, saturating float-to-integer conversion, round-to-odd
  * narrowing, and the bit-exact 7-bit reciprocal (square-root) estimates.
  *
+ * Half precision has no portable host type. A half operation is computed in double under the
+ * same rounding mode (exactly for add, subtract, multiply and conversions; once rounded for
+ * divide, square root and fused multiply-add) and then rounded to half in software, which
+ * also detects tininess after rounding as RISC-V requires. Because double carries more than
+ * 2 * 11 + 2 significand bits, this double rounding gives the correctly rounded half result.
+ *
  * Known limitation: the host has no round-to-nearest-max-magnitude mode, so frm = RMM rounds
  * ties to even for arithmetic (conversions to integer do honour RMM).
  */
 #include "processor/registers.h"
 #include "processor/vector/vector_config.h"
 #include "processor/vector/vector_exec.h"
+#include "processor/vector/vector_format.h"
 
 #include <cfenv>
 #include <cmath>
 #include <cstring>
 #include <limits>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 
 #if defined(__clang__)
@@ -126,6 +135,112 @@ struct Format<double>
     static constexpr u64 kCanonicalNaN = 0x7FF8000000000000ULL;
 };
 
+/// IEEE 754 binary16, stored as bits; arithmetic goes through double (see the file comment).
+struct Half
+{
+    uint16_t bits;
+};
+
+template <>
+struct Format<Half>
+{
+    using Bits = uint16_t;
+    static constexpr unsigned kBits = 16;
+    static constexpr unsigned kExpBits = 5;
+    static constexpr unsigned kSigBits = 10;
+    static constexpr u64 kCanonicalNaN = 0x7E00ULL;
+};
+
+template <typename T>
+inline constexpr bool kIsHalf = std::is_same_v<T, Half>;
+
+/**
+ * @brief Rounds a double to half under the host rounding mode and raises the host flags
+ * (inexact, overflow, and underflow with tininess detected after rounding).
+ */
+u64 roundToHalf(double v)
+{
+    if (std::isnan(v))
+        return Format<Half>::kCanonicalNaN;
+    const u64 sign = std::signbit(v) ? 0x8000U : 0U;
+    const double a = std::fabs(v);
+    if (std::isinf(a))
+        return sign | 0x7C00U;
+    if (a == 0)
+        return sign;
+
+    const int mode = std::fegetround();
+    // Rounds the integer-and-fraction split of a scaled value; returns the rounded integer.
+    auto roundScaled = [&](double scaled, bool &inexact)
+    {
+        const double whole = std::floor(scaled);
+        const double fraction = scaled - whole; // exact
+        inexact = fraction != 0;
+        double r = whole;
+        if (mode == FE_TONEAREST)
+        {
+            if (fraction > 0.5 || (fraction == 0.5 && std::fmod(whole, 2.0) != 0))
+                r += 1;
+        }
+        else if (mode == FE_UPWARD)
+        {
+            if (inexact && sign == 0)
+                r += 1;
+        }
+        else if (mode == FE_DOWNWARD)
+        {
+            if (inexact && sign != 0)
+                r += 1;
+        }
+        return r;
+    };
+
+    int e = 0;
+    std::frexp(a, &e);
+    const int exp = e - 1; // a is in [2^exp, 2^(exp + 1))
+    const bool priorInexact = std::fetestexcept(FE_INEXACT) != 0;
+
+    if (exp >= -14)
+    {
+        bool inexact = false;
+        double m = roundScaled(std::ldexp(a, 10 - exp), inexact); // in [1024, 2048]
+        int outExp = exp;
+        if (m == 2048)
+        {
+            m = 1024;
+            ++outExp;
+        }
+        if (inexact)
+            std::feraiseexcept(FE_INEXACT);
+        if (outExp > 15)
+        {
+            std::feraiseexcept(FE_OVERFLOW | FE_INEXACT);
+            const bool toInfinity = mode == FE_TONEAREST || (mode == FE_UPWARD && sign == 0) ||
+                                    (mode == FE_DOWNWARD && sign != 0);
+            return sign | (toInfinity ? 0x7C00U : 0x7BFFU);
+        }
+        return sign | (static_cast<u64>(outExp + 15) << 10) | (static_cast<u64>(m) - 1024);
+    }
+
+    // Below the normal range: the result is a multiple of 2^-24.
+    bool inexact = false;
+    const double m = roundScaled(std::ldexp(a, 24), inexact); // in [0, 1024]
+    // Tininess after rounding: round to 11 significant bits with an unbounded exponent range.
+    bool unboundedInexact = false;
+    const double unbounded = std::ldexp(roundScaled(std::ldexp(a, 10 - exp), unboundedInexact),
+                                        exp - 10);
+    const bool tiny = unbounded < std::ldexp(1.0, -14);
+    if (inexact)
+        std::feraiseexcept(FE_INEXACT);
+    if (tiny && (inexact || priorInexact))
+        std::feraiseexcept(FE_UNDERFLOW);
+    return sign | static_cast<u64>(m); // m = 1024 encodes the smallest normal
+}
+
+/// Raises invalid for signaling NaN operands of a half operation (the conversion to double
+/// is done in software and does not raise it).
+void raiseForSignalingHalf(std::initializer_list<u64> operands);
+
 template <typename T>
 T fromBits(u64 raw)
 {
@@ -156,11 +271,30 @@ bool isSignalingNaN(u64 raw)
     return isNaN<T>(raw) && ((raw >> (Format<T>::kSigBits - 1)) & 1U) == 0;
 }
 
+void raiseForSignalingHalf(std::initializer_list<u64> operands)
+{
+    for (u64 raw : operands)
+    {
+        if (isSignalingNaN<Half>(raw))
+            std::feraiseexcept(FE_INVALID);
+    }
+}
+
 /// Result of an arithmetic operation: NaNs become the canonical NaN.
 template <typename T>
 u64 result(T value)
 {
     return std::isnan(value) ? Format<T>::kCanonicalNaN : toBits(value);
+}
+
+/// Value of a float, double or half element as a double (exact).
+template <typename T>
+double valueOf(u64 raw)
+{
+    if constexpr (kIsHalf<T>)
+        return halfToDouble(raw);
+    else
+        return static_cast<double>(fromBits<T>(raw));
 }
 
 /// Runs one element operation with cleared host flags and accrues the raised flags.
@@ -188,8 +322,8 @@ u64 minMax(ExecState &s, u64 a, u64 b, bool isMax)
         return b;
     if (bNaN)
         return a;
-    const T x = fromBits<T>(a);
-    const T y = fromBits<T>(b);
+    const double x = valueOf<T>(a);
+    const double y = valueOf<T>(b);
     if (x == y) // equal, including +0 / -0
     {
         const bool aNegative = std::signbit(x);
@@ -409,14 +543,29 @@ u64 floatToInteger(ExecState &s, double v, unsigned bits, bool isSigned, unsigne
 template <typename T>
 u64 integerToFloat(ExecState &s, u64 raw, unsigned bits, bool isSigned)
 {
-    return withFlags(s,
-                     [&]
-                     {
-                         volatile T value = isSigned
-                                                ? static_cast<T>(signExtend(raw, bits))
-                                                : static_cast<T>(raw & maskBits(bits));
-                         return toBits(static_cast<T>(value));
-                     });
+    if constexpr (kIsHalf<T>)
+    {
+        // Integers converted to half are at most 32 bits wide, so exact in double.
+        return withFlags(s,
+                         [&]
+                         {
+                             const double value =
+                                 isSigned ? static_cast<double>(signExtend(raw, bits))
+                                          : static_cast<double>(raw & maskBits(bits));
+                             return roundToHalf(value);
+                         });
+    }
+    else
+    {
+        return withFlags(s,
+                         [&]
+                         {
+                             volatile T value = isSigned
+                                                    ? static_cast<T>(signExtend(raw, bits))
+                                                    : static_cast<T>(raw & maskBits(bits));
+                             return toBits(static_cast<T>(value));
+                         });
+    }
 }
 
 template <typename T>
@@ -487,16 +636,14 @@ unsigned roundingFromFrm(const ExecState &s)
 
 void requireFloatSew(const ExecState &s, unsigned sew)
 {
-    s.require(sew == 32 || sew == 64,
-              "floating-point element width " + std::to_string(sew) +
-                  " is not supported (SEW must be 32 or 64)");
+    s.require(config().supportsFloat(sew),
+              "floating-point element width " + std::to_string(sew) + " is not supported by " +
+                  config().describe());
 }
 
 template <typename T>
 u64 binaryOp(ExecState &s, const std::string &base, u64 a, u64 b)
 {
-    const T x = fromBits<T>(a);
-    const T y = fromBits<T>(b);
     const u64 sign = 1ULL << (Format<T>::kBits - 1);
     if (base == "vfmin" || base == "vfmax")
         return minMax<T>(s, a, b, base == "vfmax");
@@ -506,57 +653,121 @@ u64 binaryOp(ExecState &s, const std::string &base, u64 a, u64 b)
         return (a & ~sign) | (~b & sign);
     if (base == "vfsgnjx")
         return a ^ (b & sign);
-    return withFlags(s,
-                     [&]
-                     {
-                         volatile T vx = x;
-                         volatile T vy = y;
-                         T r{};
-                         if (base == "vfadd")
-                             r = vx + vy;
-                         else if (base == "vfsub")
-                             r = vx - vy;
-                         else if (base == "vfrsub")
-                             r = vy - vx;
-                         else if (base == "vfmul")
-                             r = vx * vy;
-                         else if (base == "vfdiv")
-                             r = vx / vy;
-                         else // vfrdiv
-                             r = vy / vx;
-                         return result<T>(r);
-                     });
+    if constexpr (kIsHalf<T>)
+    {
+        // Sums, differences and products of halves are exact in double.
+        return withFlags(s,
+                         [&]
+                         {
+                             raiseForSignalingHalf({a, b});
+                             volatile double x = halfToDouble(a);
+                             volatile double y = halfToDouble(b);
+                             double r = 0;
+                             if (base == "vfadd")
+                                 r = x + y;
+                             else if (base == "vfsub")
+                                 r = x - y;
+                             else if (base == "vfrsub")
+                                 r = y - x;
+                             else if (base == "vfmul")
+                                 r = x * y;
+                             else if (base == "vfdiv")
+                                 r = x / y;
+                             else // vfrdiv
+                                 r = y / x;
+                             return roundToHalf(r);
+                         });
+    }
+    else
+    {
+        const T x = fromBits<T>(a);
+        const T y = fromBits<T>(b);
+        return withFlags(s,
+                         [&]
+                         {
+                             volatile T vx = x;
+                             volatile T vy = y;
+                             T r{};
+                             if (base == "vfadd")
+                                 r = vx + vy;
+                             else if (base == "vfsub")
+                                 r = vx - vy;
+                             else if (base == "vfrsub")
+                                 r = vy - vx;
+                             else if (base == "vfmul")
+                                 r = vx * vy;
+                             else if (base == "vfdiv")
+                                 r = vx / vy;
+                             else // vfrdiv
+                                 r = vy / vx;
+                             return result<T>(r);
+                         });
+    }
 }
 
 /// vd = fma per the eight RVV forms; s1 = vs1/rs1, a = vs2, d = old vd.
 template <typename T>
 u64 fusedOp(ExecState &s, const std::string &base, u64 s1, u64 a, u64 d)
 {
-    return withFlags(s,
-                     [&]
-                     {
-                         const T x = fromBits<T>(s1);
-                         const T v2 = fromBits<T>(a);
-                         const T vd = fromBits<T>(d);
-                         T r{};
-                         if (base == "vfmacc" || base == "vfwmacc")
-                             r = std::fma(x, v2, vd);
-                         else if (base == "vfnmacc" || base == "vfwnmacc")
-                             r = std::fma(-x, v2, -vd);
-                         else if (base == "vfmsac" || base == "vfwmsac")
-                             r = std::fma(x, v2, -vd);
-                         else if (base == "vfnmsac" || base == "vfwnmsac")
-                             r = std::fma(-x, v2, vd);
-                         else if (base == "vfmadd")
-                             r = std::fma(x, vd, v2);
-                         else if (base == "vfnmadd")
-                             r = std::fma(-x, vd, -v2);
-                         else if (base == "vfmsub")
-                             r = std::fma(x, vd, -v2);
-                         else // vfnmsub
-                             r = std::fma(-x, vd, v2);
-                         return result<T>(r);
-                     });
+    if constexpr (kIsHalf<T>)
+    {
+        // The product of two halves is exact in double; the fused sum is rounded once to
+        // double and once to half, which cannot change the half result (file comment).
+        return withFlags(s,
+                         [&]
+                         {
+                             raiseForSignalingHalf({s1, a, d});
+                             const double x = halfToDouble(s1);
+                             const double v2 = halfToDouble(a);
+                             const double vd = halfToDouble(d);
+                             volatile double r = 0;
+                             if (base == "vfmacc")
+                                 r = std::fma(x, v2, vd);
+                             else if (base == "vfnmacc")
+                                 r = std::fma(-x, v2, -vd);
+                             else if (base == "vfmsac")
+                                 r = std::fma(x, v2, -vd);
+                             else if (base == "vfnmsac")
+                                 r = std::fma(-x, v2, vd);
+                             else if (base == "vfmadd")
+                                 r = std::fma(x, vd, v2);
+                             else if (base == "vfnmadd")
+                                 r = std::fma(-x, vd, -v2);
+                             else if (base == "vfmsub")
+                                 r = std::fma(x, vd, -v2);
+                             else // vfnmsub
+                                 r = std::fma(-x, vd, v2);
+                             return roundToHalf(r);
+                         });
+    }
+    else
+    {
+        return withFlags(s,
+                         [&]
+                         {
+                             const T x = fromBits<T>(s1);
+                             const T v2 = fromBits<T>(a);
+                             const T vd = fromBits<T>(d);
+                             T r{};
+                             if (base == "vfmacc" || base == "vfwmacc")
+                                 r = std::fma(x, v2, vd);
+                             else if (base == "vfnmacc" || base == "vfwnmacc")
+                                 r = std::fma(-x, v2, -vd);
+                             else if (base == "vfmsac" || base == "vfwmsac")
+                                 r = std::fma(x, v2, -vd);
+                             else if (base == "vfnmsac" || base == "vfwnmsac")
+                                 r = std::fma(-x, v2, vd);
+                             else if (base == "vfmadd")
+                                 r = std::fma(x, vd, v2);
+                             else if (base == "vfnmadd")
+                                 r = std::fma(-x, vd, -v2);
+                             else if (base == "vfmsub")
+                                 r = std::fma(x, vd, -v2);
+                             else // vfnmsub
+                                 r = std::fma(-x, vd, v2);
+                             return result<T>(r);
+                         });
+    }
 }
 
 template <typename T>
@@ -567,7 +778,7 @@ bool compareOp(ExecState &s, const std::string &base, u64 a, u64 b)
     {
         if (isSignalingNaN<T>(a) || isSignalingNaN<T>(b))
             s.fflags |= kNV; // quiet comparison
-        const bool equal = !anyNaN && fromBits<T>(a) == fromBits<T>(b);
+        const bool equal = !anyNaN && valueOf<T>(a) == valueOf<T>(b);
         return base == "vmfeq" ? equal : !equal;
     }
     if (anyNaN)
@@ -575,8 +786,8 @@ bool compareOp(ExecState &s, const std::string &base, u64 a, u64 b)
         s.fflags |= kNV; // signaling comparison
         return false;
     }
-    const T x = fromBits<T>(a);
-    const T y = fromBits<T>(b);
+    const double x = valueOf<T>(a);
+    const double y = valueOf<T>(b);
     if (base == "vmflt")
         return x < y;
     if (base == "vmfle")
@@ -595,12 +806,55 @@ u64 unaryOp(ExecState &s, const std::string &base, u64 a, unsigned rm)
         return rsqrt7<T>(s, a);
     if (base == "vfrec7")
         return rec7<T>(s, a, rm);
-    return withFlags(s,
-                     [&]
-                     {
-                         volatile T x = fromBits<T>(a);
-                         return result<T>(std::sqrt(static_cast<T>(x)));
-                     });
+    if constexpr (kIsHalf<T>)
+    {
+        return withFlags(s,
+                         [&]
+                         {
+                             raiseForSignalingHalf({a});
+                             volatile double x = halfToDouble(a);
+                             return roundToHalf(std::sqrt(static_cast<double>(x)));
+                         });
+    }
+    else
+    {
+        return withFlags(s,
+                         [&]
+                         {
+                             volatile T x = fromBits<T>(a);
+                             return result<T>(std::sqrt(static_cast<T>(x)));
+                         });
+    }
+}
+
+/// Calls fn with a value of the element type for SEW (Half, float or double).
+template <typename Fn>
+u64 bySew(unsigned sew, Fn &&fn)
+{
+    switch (sew)
+    {
+    case 16:
+        return fn(Half{});
+    case 32:
+        return fn(float{});
+    default:
+        return fn(double{});
+    }
+}
+
+/// Converts a narrow element exactly to the next wider format (half to single, single to
+/// double). A signaling NaN raises invalid; NaNs become the canonical NaN of the wide format.
+u64 widenExact(ExecState &s, u64 raw, unsigned narrowEew)
+{
+    if (narrowEew == 16)
+    {
+        if (isSignalingNaN<Half>(raw))
+            s.fflags |= kNV;
+        if (isNaN<Half>(raw))
+            return Format<float>::kCanonicalNaN;
+        return toBits(static_cast<float>(halfToDouble(raw)));
+    }
+    return withFlags(s, [&] { return result<double>(asDouble<float>(raw)); });
 }
 
 // ------------------------------------------------------------------ handlers
@@ -626,7 +880,6 @@ void elementwise(ExecState &s, Kind kind, unsigned rm)
         s.checkGroup(s.group(s.vs1(), s.sew), "vs1");
     s.checkMaskOverlap(d);
     const std::string &base = s.info.base;
-    const bool f32 = s.sew == 32;
     for (u64 i = s.vstart; i < s.vl; ++i)
     {
         if (!s.active(i))
@@ -639,17 +892,17 @@ void elementwise(ExecState &s, Kind kind, unsigned rm)
         if (kind == Kind::Binary)
         {
             const u64 b = fpSrc1(s, i, s.sew);
-            r = f32 ? binaryOp<float>(s, base, a, b) : binaryOp<double>(s, base, a, b);
+            r = bySew(s.sew, [&](auto t) { return binaryOp<decltype(t)>(s, base, a, b); });
         }
         else if (kind == Kind::FusedMulAdd)
         {
             const u64 b = fpSrc1(s, i, s.sew);
             const u64 old = s.read(d.reg, i, s.sew);
-            r = f32 ? fusedOp<float>(s, base, b, a, old) : fusedOp<double>(s, base, b, a, old);
+            r = bySew(s.sew, [&](auto t) { return fusedOp<decltype(t)>(s, base, b, a, old); });
         }
         else // Unary
         {
-            r = f32 ? unaryOp<float>(s, base, a, rm) : unaryOp<double>(s, base, a, rm);
+            r = bySew(s.sew, [&](auto t) { return unaryOp<decltype(t)>(s, base, a, rm); });
         }
         s.write(d.reg, i, s.sew, r);
     }
@@ -678,8 +931,9 @@ void compare(ExecState &s)
         }
         const u64 av = s.read(s.vs2(), i, s.sew);
         const u64 bv = fpSrc1(s, i, s.sew);
-        const bool r = s.sew == 32 ? compareOp<float>(s, s.info.base, av, bv)
-                                   : compareOp<double>(s, s.info.base, av, bv);
+        const bool r =
+            bySew(s.sew, [&](auto t) -> u64
+                  { return compareOp<decltype(t)>(s, s.info.base, av, bv) ? 1 : 0; }) != 0;
         s.writeMaskBit(d.reg, i, r);
     }
     s.maskTail(d.reg, s.vl);
@@ -709,18 +963,22 @@ void merge(ExecState &s)
 void widening(ExecState &s, unsigned rm)
 {
     (void)rm;
-    s.require(s.sew == 32, "widening floating-point operations require SEW = 32");
+    s.require(config().supportsFloat(s.sew) && config().supportsFloat(2 * s.sew),
+              "widening floating-point operations need SEW and 2*SEW floating point (" +
+                  config().describe() + ")");
     const std::string &base = s.info.base;
     const bool wideA = !s.info.suffix.empty() && s.info.suffix[0] == 'w';
     const bool fused = base.find("macc") != std::string::npos || base.find("msac") != std::string::npos;
-    const Group d = s.group(s.vd(), 64);
+    const unsigned narrowEew = s.sew;
+    const unsigned wideEew = 2 * s.sew;
+    const Group d = s.group(s.vd(), wideEew);
     s.checkGroup(d, "vd");
-    const Group a = s.group(s.vs2(), wideA ? 64 : 32);
+    const Group a = s.group(s.vs2(), wideA ? wideEew : narrowEew);
     s.checkGroup(a, "vs2");
     s.checkOverlap(d, a, "vs2");
     if (s.hasVectorSrc1())
     {
-        const Group b = s.group(s.vs1(), 32);
+        const Group b = s.group(s.vs1(), narrowEew);
         s.checkGroup(b, "vs1");
         s.checkOverlap(d, b, "vs1");
     }
@@ -732,22 +990,25 @@ void widening(ExecState &s, unsigned rm)
             s.inactive(d, i);
             continue;
         }
-        const u64 rawA = s.read(s.vs2(), i, wideA ? 64 : 32);
-        const u64 rawB = fpSrc1(s, i, 32);
+        const u64 rawA = s.read(s.vs2(), i, wideA ? wideEew : narrowEew);
+        const u64 rawB = fpSrc1(s, i, narrowEew);
         // Widen the narrow operands exactly (an sNaN raises invalid here, as it would in the op).
-        const u64 wa = wideA ? rawA : withFlags(s, [&] { return toBits(asDouble<float>(rawA)); });
-        const u64 wb = withFlags(s, [&] { return toBits(asDouble<float>(rawB)); });
-        u64 r = 0;
-        if (fused)
-        {
-            r = fusedOp<double>(s, base, wb, wa, s.read(d.reg, i, 64));
-        }
-        else
-        {
-            const std::string op = base == "vfwadd" ? "vfadd" : base == "vfwsub" ? "vfsub" : "vfmul";
-            r = binaryOp<double>(s, op, wa, wb);
-        }
-        s.write(d.reg, i, 64, r);
+        const u64 wa = wideA ? rawA : widenExact(s, rawA, narrowEew);
+        const u64 wb = widenExact(s, rawB, narrowEew);
+        const std::string op = fused                ? base
+                               : base == "vfwadd"   ? "vfadd"
+                               : base == "vfwsub"   ? "vfsub"
+                                                    : "vfmul";
+        const u64 old = fused ? s.read(d.reg, i, wideEew) : 0;
+        const u64 r = bySew(wideEew,
+                            [&](auto t)
+                            {
+                                using W = decltype(t);
+                                if (fused)
+                                    return fusedOp<W>(s, op, wb, wa, old);
+                                return binaryOp<W>(s, op, wa, wb);
+                            });
+        s.write(d.reg, i, wideEew, r);
     }
     s.tail(d);
 }
@@ -770,11 +1031,16 @@ void convert(ExecState &s, unsigned rm)
     const unsigned dstEew = widen ? 2 * s.sew : s.sew;
     const unsigned floatEew = toInt ? srcEew : dstEew; // width of the floating-point side
     const unsigned otherEew = toInt ? dstEew : srcEew;
-    s.require(srcEew <= kElen && dstEew <= kElen, "conversion requires 2*SEW <= ELEN");
-    s.require(floatEew == 32 || floatEew == 64,
-              "floating-point width " + std::to_string(floatEew) + " is not supported");
+    s.require(srcEew <= config().elen() && dstEew <= config().elen(),
+              "conversion requires 2*SEW <= ELEN");
+    s.require(config().supportsFloat(floatEew), "floating-point width " +
+                                                    std::to_string(floatEew) +
+                                                    " is not supported by " + config().describe());
     if (!toInt && !fromInt) // float to float
-        s.require(otherEew == 32 || otherEew == 64, "floating-point width is not supported");
+        s.require(config().supportsFloat(otherEew), "floating-point width " +
+                                                        std::to_string(otherEew) +
+                                                        " is not supported by " +
+                                                        config().describe());
 
     const Group d = s.group(s.vd(), dstEew);
     const Group a = s.group(s.vs2(), srcEew);
@@ -795,31 +1061,41 @@ void convert(ExecState &s, unsigned rm)
         u64 r = 0;
         if (toInt)
         {
-            const double value = srcEew == 32 ? asDouble<float>(raw) : asDouble<double>(raw);
-            if (srcEew == 32 && isSignalingNaN<float>(raw))
-                s.fflags |= kNV;
-            if (srcEew == 64 && isSignalingNaN<double>(raw))
-                s.fflags |= kNV;
-            r = floatToInteger(s, value, dstEew, isSigned, rounding);
+            const u64 valueBits = bySew(srcEew,
+                                        [&](auto t)
+                                        {
+                                            using T = decltype(t);
+                                            if (isSignalingNaN<T>(raw))
+                                                s.fflags |= kNV;
+                                            return toBits(valueOf<T>(raw));
+                                        });
+            r = floatToInteger(s, fromBits<double>(valueBits), dstEew, isSigned, rounding);
         }
         else if (fromInt)
         {
-            r = dstEew == 32 ? integerToFloat<float>(s, raw, srcEew, isSigned)
-                             : integerToFloat<double>(s, raw, srcEew, isSigned);
+            r = bySew(dstEew, [&](auto t)
+                      { return integerToFloat<decltype(t)>(s, raw, srcEew, isSigned); });
         }
-        else if (widen) // f32 -> f64, exact
+        else if (widen) // f16 -> f32 or f32 -> f64, exact
         {
-            r = withFlags(s, [&] { return result<double>(asDouble<float>(raw)); });
+            r = widenExact(s, raw, srcEew);
         }
-        else // f64 -> f32
+        else // f32 -> f16 or f64 -> f32
         {
+            const bool toHalf = dstEew == 16;
             r = withFlags(s,
                           [&]
                           {
+                              if (toHalf)
+                              {
+                                  volatile double value = asDouble<float>(raw); // exact
+                                  return roundToHalf(value);
+                              }
                               volatile double value = fromBits<double>(raw);
                               return result<float>(static_cast<float>(value));
                           });
-            if (rod && (std::fetestexcept(FE_INEXACT) != 0) && !isNaN<float>(r))
+            const bool resultIsNaN = toHalf ? isNaN<Half>(r) : isNaN<float>(r);
+            if (rod && (std::fetestexcept(FE_INEXACT) != 0) && !resultIsNaN)
             {
                 r |= 1U; // round to odd: jam inexactness into the least significant bit
             }
@@ -836,36 +1112,57 @@ void reduction(ExecState &s, unsigned rm)
     const std::string &base = s.info.base;
     const bool widen = base.rfind("vfwred", 0) == 0;
     if (widen)
-        s.require(s.sew == 32, "widening floating-point reductions require SEW = 32");
+        s.require(config().supportsFloat(s.sew) && config().supportsFloat(2 * s.sew),
+                  "widening floating-point reductions need SEW and 2*SEW floating point (" +
+                      config().describe() + ")");
     else
         requireFloatSew(s, s.sew);
     s.checkGroup(s.group(s.vs2(), s.sew), "vs2");
     if (s.vl == 0)
         return;
-    const unsigned accEew = widen ? 64 : s.sew;
+    const unsigned accEew = widen ? 2 * s.sew : s.sew;
     u64 acc = s.read(s.vs1(), 0, accEew);
     const bool isMin = base == "vfredmin";
     const bool isMax = base == "vfredmax";
+    const bool unordered = base == "vfredusum" || base == "vfwredusum";
+    bool anyActive = false;
     // Unordered sums are computed in element order, which is one of the permitted orders.
     for (u64 i = 0; i < s.vl; ++i)
     {
         if (!s.active(i))
             continue;
+        anyActive = true;
         u64 x = s.read(s.vs2(), i, s.sew);
         if (widen)
         {
-            x = withFlags(s, [&] { return toBits(asDouble<float>(x)); });
-            acc = binaryOp<double>(s, "vfadd", acc, x);
+            x = widenExact(s, x, s.sew);
+            acc = bySew(accEew, [&](auto t) { return binaryOp<decltype(t)>(s, "vfadd", acc, x); });
         }
         else if (isMin || isMax)
         {
-            acc = s.sew == 32 ? minMax<float>(s, acc, x, isMax) : minMax<double>(s, acc, x, isMax);
+            acc = bySew(s.sew, [&](auto t) { return minMax<decltype(t)>(s, acc, x, isMax); });
         }
         else
         {
-            acc = s.sew == 32 ? binaryOp<float>(s, "vfadd", acc, x)
-                              : binaryOp<double>(s, "vfadd", acc, x);
+            acc = bySew(s.sew, [&](auto t) { return binaryOp<decltype(t)>(s, "vfadd", acc, x); });
         }
+    }
+    if (unordered && !anyActive)
+    {
+        // With no active element, the result is vs1[0] plus an additive identity, which the
+        // spec allows for unordered sums: a NaN becomes the canonical NaN (invalid for a
+        // signaling NaN). Spike makes the same choice.
+        const bool nan = accEew == 16 ? isNaN<Half>(acc) : accEew == 32 ? isNaN<float>(acc)
+                                                                       : isNaN<double>(acc);
+        const bool signaling = accEew == 16   ? isSignalingNaN<Half>(acc)
+                               : accEew == 32 ? isSignalingNaN<float>(acc)
+                                              : isSignalingNaN<double>(acc);
+        if (signaling)
+            s.fflags |= kNV;
+        if (nan)
+            acc = accEew == 16   ? Format<Half>::kCanonicalNaN
+                  : accEew == 32 ? Format<float>::kCanonicalNaN
+                                 : Format<double>::kCanonicalNaN;
     }
     s.write(s.vd(), 0, accEew, acc);
     s.tailFrom(Group{s.vd(), accEew, 0}, 1);

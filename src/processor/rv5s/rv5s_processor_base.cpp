@@ -121,6 +121,7 @@ void RV5StageVM_Base::Reset()
     ex_mem_reg_.reset();
     mem_wb_reg_.reset();
     current_delta_ = RV5StageStepDelta{};
+    vector_profiler_.reset();
     undo_stack_ = std::stack<RV5StageStepDelta>();
     redo_stack_ = std::stack<RV5StageStepDelta>();
     processor_state_.reset();
@@ -680,7 +681,8 @@ void RV5StageVM_Base::execute_at_writeback()
     {
         if (rvv::isVectorInstruction(instruction))
         {
-            rvv::ExecutionContext context{registers_, memory_controller_, current_delta_};
+            rvv::ExecutionContext context{registers_, memory_controller_, current_delta_,
+                                          &vector_profiler_, cycle_s_};
             rvv::execute(instruction, context);
         }
         else
@@ -1101,6 +1103,10 @@ void RV5StageVM_Base::Undo()
     {
         registers_.WriteVr(change.reg_index, change.old_bytes);
     }
+    if (last.vector_profile_before)
+    {
+        vector_profiler_.restore(*last.vector_profile_before);
+    }
 
     for (auto it = last.memory_changes.rbegin(); it != last.memory_changes.rend(); ++it)
     {
@@ -1168,6 +1174,10 @@ void RV5StageVM_Base::Redo()
     for (const auto &change : next.vector_register_changes)
     {
         registers_.WriteVr(change.reg_index, change.new_bytes);
+    }
+    if (next.vector_profile_after)
+    {
+        vector_profiler_.restore(*next.vector_profile_after);
     }
 
     for (const auto &change : next.memory_changes)

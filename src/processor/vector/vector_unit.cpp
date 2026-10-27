@@ -10,6 +10,7 @@
 #include "processor/registers.h"
 #include "processor/vector/vector_config.h"
 #include "processor/vector/vector_exec.h"
+#include "processor/vector/vector_profiler.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -54,6 +55,10 @@ uint64_t ExecState::scalarOperand() const
     {
         return field(kZimm5);
     }
+    if (info.hasField(kZimm6))
+    {
+        return field(kZimm6);
+    }
     return 0;
 }
 
@@ -74,6 +79,7 @@ uint64_t ExecState::read(unsigned reg, uint64_t index, unsigned eew) const
     {
         illegal("register group extends past v31");
     }
+    registersRead |= 1U << (offset / vlenb);
     uint64_t value = 0;
     for (unsigned b = 0; b < bytes; ++b)
     {
@@ -90,6 +96,7 @@ void ExecState::write(unsigned reg, uint64_t index, unsigned eew, uint64_t value
     {
         illegal("register group extends past v31");
     }
+    registersWritten |= 1U << (offset / vlenb);
     for (unsigned b = 0; b < bytes; ++b)
     {
         destination[offset + b] = static_cast<uint8_t>(value >> (8 * b));
@@ -99,7 +106,9 @@ void ExecState::write(unsigned reg, uint64_t index, unsigned eew, uint64_t value
 bool ExecState::maskBit(unsigned reg, uint64_t index) const
 {
     const uint64_t offset = static_cast<uint64_t>(reg) * vlenb + index / 8;
-    return ((source.at(offset) >> (index % 8)) & 1U) != 0;
+    const bool value = ((source.at(offset) >> (index % 8)) & 1U) != 0;
+    registersRead |= 1U << (offset / vlenb);
+    return value;
 }
 
 void ExecState::writeMaskBit(unsigned reg, uint64_t index, bool value)
@@ -107,6 +116,7 @@ void ExecState::writeMaskBit(unsigned reg, uint64_t index, bool value)
     const uint64_t offset = static_cast<uint64_t>(reg) * vlenb + index / 8;
     const auto bit = static_cast<uint8_t>(1U << (index % 8));
     uint8_t &byte = destination.at(offset);
+    registersWritten |= 1U << (offset / vlenb);
     byte = value ? static_cast<uint8_t>(byte | bit) : static_cast<uint8_t>(byte & ~bit);
 }
 
@@ -440,6 +450,73 @@ void commit(ExecState &s)
 
 } // namespace detail
 
+namespace detail
+{
+/// Summarises an executed instruction for the profiler.
+InstructionRecord profileRecord(const ExecState &s)
+{
+    InstructionRecord r;
+    r.info = &s.info;
+    r.sew = s.sew;
+    r.lmulLog2 = s.lmulLog2;
+    r.vl = s.vl;
+    r.vlmax = s.vtype.vill() ? 0 : s.vlmax;
+    r.vstart = s.vstart;
+    r.issueCycle = s.context.cycle;
+    const uint64_t body = s.vl > s.vstart ? s.vl - s.vstart : 0;
+    r.activeElements = body;
+    if (s.masked)
+    {
+        r.activeElements = 0;
+        for (uint64_t i = s.vstart; i < s.vl; ++i)
+            r.activeElements += s.maskBit(0, i) ? 1 : 0;
+    }
+    r.inactiveElements = body - r.activeElements;
+    r.bytesLoaded = s.bytesLoaded;
+    for (const PendingStore &store : s.stores)
+        r.bytesStored += store.bytes;
+    r.registersRead = s.registersRead;
+    r.registersWritten = s.registersWritten;
+
+    const InsnInfo &info = s.info;
+    const bool scalarMove = (info.base == "vmv" && (info.suffix == "x.s" || info.suffix == "s.x")) ||
+                            (info.base == "vfmv" && (info.suffix == "f.s" || info.suffix == "s.f"));
+    if (info.isConfig())
+    {
+        r.bodyElements = 0;
+    }
+    else if (info.isLoad() || info.isStore())
+    {
+        const unsigned mop = (s.word >> 26) & 3U;
+        const unsigned width = info.funct3;
+        const unsigned eew = (mop == 1 || mop == 3) ? s.sew
+                             : width == 0             ? 8
+                             : width == 5             ? 16
+                             : width == 6             ? 32
+                                                      : 64;
+        r.unitStride = mop == 0;
+        r.bodyElements = (r.bytesLoaded + r.bytesStored) / std::max(1U, eew / 8);
+    }
+    else if (scalarMove)
+    {
+        r.bodyElements = 1;
+    }
+    else if (info.base == "vmv1r" || info.base == "vmv2r" || info.base == "vmv4r" ||
+             info.base == "vmv8r")
+    {
+        uint64_t registers = 0;
+        for (uint32_t bits = s.registersWritten; bits != 0; bits &= bits - 1)
+            ++registers;
+        r.bodyElements = registers * s.vlenb / std::max(1U, s.sew / 8);
+    }
+    else
+    {
+        r.bodyElements = body;
+    }
+    return r;
+}
+} // namespace detail
+
 void execute(uint32_t word, ExecutionContext &context)
 {
     const InsnInfo *info = decode(word);
@@ -450,6 +527,16 @@ void execute(uint32_t word, ExecutionContext &context)
         throw IllegalInstruction(std::string("Illegal vector instruction: ") + buf);
     }
     detail::ExecState state(*info, word, context);
+    const VectorConfig &cfg = config();
+    const bool enabled = info->extension == kExtV ||
+                         (info->extension == kExtZvkb && (cfg.zvkb || cfg.zvbb)) ||
+                         (info->extension == kExtZvbb && cfg.zvbb) ||
+                         (info->extension == kExtZvbc && cfg.zvbc);
+    if (!enabled)
+    {
+        state.illegal(extensionName(info->extension) + " is not enabled (vector extensions: " +
+                      cfg.describe() + ")");
+    }
     if (info->isConfig())
     {
         detail::executeConfig(state);
@@ -467,6 +554,14 @@ void execute(uint32_t word, ExecutionContext &context)
         detail::executeInteger(state);
     }
     detail::commit(state);
+    if (context.profiler != nullptr)
+    {
+        context.delta.vector_profile_before =
+            std::make_shared<const ProfilerState>(context.profiler->state());
+        context.profiler->record(detail::profileRecord(state));
+        context.delta.vector_profile_after =
+            std::make_shared<const ProfilerState>(context.profiler->state());
+    }
 }
 
 bool isImplemented(const InsnInfo &info)

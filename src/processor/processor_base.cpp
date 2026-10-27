@@ -5,6 +5,7 @@
  */
 
 #include "processor/processor_base.h"
+#include "processor/vector/vector_isa.h"
 #include "common/globals.h"
 #include "config/config.h"
 #include <algorithm>
@@ -321,6 +322,26 @@ void ProcessorBase::RemoveBreakpoint(uint64_t val, bool is_line)
 bool ProcessorBase::CheckBreakpoint(uint64_t address)
 {
     return std::find(breakpoints_.begin(), breakpoints_.end(), address) != breakpoints_.end();
+}
+
+void ProcessorBase::appendVectorUnitWires(uint32_t instruction, bool fromPipelineRegister)
+{
+    const rvv::InsnInfo *info = rvv::decode(instruction);
+    if (info == nullptr)
+        return;
+    if (fromPipelineRegister)
+        active_wires_.append("P4_to_VU");
+    active_wires_.append("RF_to_VU");
+    if (info->isLoad() || info->isStore())
+        active_wires_.append("VU_to_DM");
+    if (info->hasField(rvv::kRd))
+        active_wires_.append("VU_to_RF");
+    if (!info->isConfig())
+    {
+        active_wires_.append("VRF_to_VU");
+        if (!info->isStore() && !info->hasField(rvv::kRd))
+            active_wires_.append("VU_to_VRF");
+    }
 }
 
 void ProcessorBase::PrintString(uint64_t address)

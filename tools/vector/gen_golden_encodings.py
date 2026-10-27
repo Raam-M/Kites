@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generate golden RVV encodings with LLVM for the Kites assembler tests.
 
-For every vector mnemonic (base forms from riscv-opcodes extensions/rv_v plus the
-segment load/store variants), this writes one or more assembly lines with
+For every vector mnemonic (base forms from riscv-opcodes extensions/rv_v, rv_zvbb
+and rv_zvbc, plus the segment load/store variants), this writes one or more assembly lines with
 representative operands (masked and unmasked, boundary immediates), assembles them
 with llvm-mc, and records the resulting 32-bit words:
 
@@ -12,7 +12,7 @@ Operands are chosen so that LLVM's static constraints are met: vector operands u
 v8/v16/v24 (aligned to 8, never overlapping) and v0 only as the mask.
 
 Usage:
-    python3 -I tools/vector/gen_golden_encodings.py <rv_v> <llvm-mc> <output.txt>
+    python3 -I tools/vector/gen_golden_encodings.py <llvm-mc> <output.txt> <rv_v> [<rv_zvbb> <rv_zvbc>]
 """
 
 import re
@@ -97,6 +97,8 @@ def operand_lines(name, fields, fixed):
         src1_variants = ["-16", "15"]
     elif "zimm5" in fields:
         src1_variants = ["0", "31"]
+    elif "zimm6lo" in fields:
+        src1_variants = ["0", "33", "63"]
     src2 = ["v16"] if "vs2" in fields else []
 
     vm_fixed_zero = "vm" not in fields and fixed.get("25") == "0"
@@ -113,11 +115,12 @@ def operand_lines(name, fields, fixed):
 
 
 def main():
-    if len(sys.argv) != 4:
+    if len(sys.argv) < 4:
         sys.exit(__doc__)
-    rv_v, llvm_mc, out_path = sys.argv[1:]
+    llvm_mc, out_path, sources = sys.argv[1], sys.argv[2], sys.argv[3:]
+    entries = [e for src in sources for e in parse_rv_v(src)]
     asm = []
-    for name, fields, fixed in parse_rv_v(rv_v):
+    for name, fields, fixed in entries:
         names = [name]
         if "nf" in fields:
             names += segment_names(name)
@@ -127,7 +130,7 @@ def main():
                 asm.append(f"{mnemonic} {ops}".strip())
 
     result = subprocess.run(
-        [llvm_mc, "-triple=riscv64", "-mattr=+v", "-show-encoding"],
+        [llvm_mc, "-triple=riscv64", "-mattr=+v,+zvbb,+zvbc", "-show-encoding"],
         input="\n".join(asm) + "\n", capture_output=True, text=True)
     if result.returncode != 0:
         sys.exit("llvm-mc failed:\n" + result.stderr)

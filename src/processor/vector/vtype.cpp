@@ -13,11 +13,6 @@ namespace Kites
 namespace rvv
 {
 
-namespace
-{
-constexpr int kElenLog2 = 6; // ELEN = 64
-} // namespace
-
 bool isSupportedVtype(uint64_t raw)
 {
     const VType vt{raw};
@@ -34,8 +29,9 @@ bool isSupportedVtype(uint64_t raw)
     {
         return false;
     }
-    // Fractional LMUL must support SEW in [SEW_MIN, LMUL * ELEN]; larger SEW is unsupported.
-    if (vt.sewLog2() > kElenLog2 + vt.lmulLog2())
+    // SEW must not exceed LMUL * ELEN (this also excludes SEW > ELEN, and LMUL = 1/8 when
+    // ELEN = 32).
+    if (vt.sewLog2() > static_cast<int>(config().elenLog2()) + vt.lmulLog2())
     {
         return false;
     }

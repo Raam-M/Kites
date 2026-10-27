@@ -133,7 +133,7 @@ TEST(VecAsm, AS02_disassembly_round_trip)
 TEST(VecAsm, table_matches_spec_inventory)
 {
     const auto &table = rvv::instructionTable();
-    EXPECT_EQ(table.size(), 627U); // 375 base + 252 segment variants
+    EXPECT_EQ(table.size(), 647U); // 375 V + 20 Zvbb/Zvbc base forms + 252 segment variants
     std::set<std::string> covered;
     for (const Golden &g : loadGolden())
         covered.insert(g.text.substr(0, g.text.find(' ')));

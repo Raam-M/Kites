@@ -103,7 +103,10 @@ void RVSSProcessor::SetActiveWireNames()
     {
         active_wires_.append("Control_to_MemtoRegMux");
     }
-
+    if (vector_instruction_)
+    {
+        appendVectorUnitWires(current_instruction_, false);
+    }
 }
 
 void RVSSProcessor::setProcessorState()
@@ -178,7 +181,8 @@ void RVSSProcessor::Decode()
 
 void RVSSProcessor::ExecuteVector()
 {
-    rvv::ExecutionContext context{registers_, memory_controller_, current_delta_};
+    rvv::ExecutionContext context{registers_, memory_controller_, current_delta_,
+                                  &vector_profiler_, cycle_s_};
     try
     {
         rvv::execute(current_instruction_, context);
@@ -1270,6 +1274,10 @@ void RVSSProcessor::Undo()
     {
         registers_.WriteVr(change.reg_index, change.old_bytes);
     }
+    if (last.vector_profile_before)
+    {
+        vector_profiler_.restore(*last.vector_profile_before);
+    }
 
     for (const auto &change : last.memory_changes)
     {
@@ -1347,6 +1355,10 @@ void RVSSProcessor::Redo()
     {
         registers_.WriteVr(change.reg_index, change.new_bytes);
     }
+    if (next.vector_profile_after)
+    {
+        vector_profiler_.restore(*next.vector_profile_after);
+    }
 
     for (const auto &change : next.memory_changes)
     {
@@ -1392,6 +1404,9 @@ void RVSSProcessor::Reset()
     current_delta_.register_changes.clear();
     current_delta_.memory_changes.clear();
     current_delta_.vector_register_changes.clear();
+    current_delta_.vector_profile_before.reset();
+    current_delta_.vector_profile_after.reset();
+    vector_profiler_.reset();
     vector_instruction_ = false;
     current_delta_.old_pc = 0;
     current_delta_.new_pc = 0;
