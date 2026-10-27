@@ -1,0 +1,1289 @@
+% Kites Vector Extension (RVV 1.0) - Scope Document and Project Plan
+% Build: tectonic scope_document.tex   (or: make)
+\documentclass[11pt]{article}
+\usepackage{kitesdoc}
+\renewcommand{\kdocshorttitle}{Kites Vector Extension --- Scope}
+\hypersetup{pdftitle={Kites Vector Extension (RVV 1.0): Scope Document}}
+
+\begin{document}
+
+% =====================================================================  TITLE
+\begin{titlepage}
+\thispagestyle{empty}
+\vspace*{1.2cm}
+{\sffamily\small\color{kgrey} CS2323 Computer Architecture \quad$\cdot$\quad IIT Hyderabad}\par
+\vspace{0.6cm}
+{\sffamily\bfseries\fontsize{26}{31}\selectfont\color{kblue} Vector Extension Support\\[2pt] for the Kites RISC-V Simulator\par}
+\vspace{0.5cm}
+{\sffamily\Large\color{kteal} Scope Document\par}
+\vspace{0.2cm}
+{\large RISC-V ``V'' Standard Extension for Vector Operations, version 1.0 (RVV~1.0)\par}
+\vspace{1.4cm}
+
+\begin{tabularx}{\textwidth}{@{}L{3.6cm}Y@{}}
+\toprule
+\textsf{\textbf{Document}}   & Scope document \\
+\textsf{\textbf{Version}}    & 1.2 \\
+\textsf{\textbf{Author}}     & Raam M \\
+\textsf{\textbf{Repository}} & \url{https://github.com/Raam-M/Kites} (fork of \url{https://github.com/hghit-harshit/Kites}) \\
+\textsf{\textbf{Branch}}     & \texttt{vector-extension}, baseline commit \texttt{7ddb6f3} \\
+\textsf{\textbf{Status}}     & For review. The scope is frozen once the open questions in Section~\ref{sec:open} are answered. \\
+\bottomrule
+\end{tabularx}
+
+\vspace{1.0cm}
+\begin{keybox}[title=Purpose of this document]
+This document defines \emph{what} will be added to Kites to support the RISC-V Vector extension,
+separates the \emph{compulsory} work from work that goes \emph{over and above} it, and states
+\emph{how} the work will be designed, validated and documented.
+\end{keybox}
+
+\vfill
+\textsf{\textbf{\color{kblue}Revision history}}\par\smallskip
+\begin{tabularx}{\textwidth}{@{}L{1.6cm}Y@{}}
+\toprule
+\textsf{Version} & \textsf{Change} \\
+\midrule
+1.0 & First complete draft: baseline analysis, scope tiers, requirements, approach, validation and documentation plans. \\
+1.1 & Removed schedule and effort estimates; technical rationale only. \\
+1.2 & Aligned with the implementation: D9 revised, module table and integration notes updated, findings F16--F19 added. \\
+\bottomrule
+\end{tabularx}
+\end{titlepage}
+
+\tableofcontents
+\clearpage
+
+% =====================================================================  1
+\section{Executive summary}\label{sec:summary}
+
+Kites is a RISC-V (RV64) assembler, simulator and IDE. Today it supports the I, M, F and D
+extensions plus CSR instructions on a single-cycle processor and on four variants of a classic
+5-stage pipeline. This project adds the RISC-V Vector extension, version~1.0 (``RVV~1.0'', the
+standard \textbf{V} extension~\cite{spec}). With the extension in place:
+
+\begin{itemize}
+  \item the assembler, disassembler and editor understand the vector instruction set;
+  \item the simulator has a vector register file, the seven vector CSRs and a vector execution unit;
+  \item stepping, undo/redo, breakpoints, register dumps, the CLI, the profiler and the GUI register
+        view are all vector-aware;
+  \item every supported instruction is validated against independent references, and the work is
+        documented for both users and developers.
+\end{itemize}
+
+\begin{keybox}[title=Scope at a glance]
+\begin{description}[leftmargin=0pt,labelsep=0.4em,itemsep=0.35em]
+\item[\tierA{Compulsory --- A1 Core.}] Vector state and CSRs; \insn{vsetvli}/\insn{vsetivli}/\insn{vsetvl};
+  all non-segment loads and stores; integer arithmetic; masking and tail/mask policies; integer
+  reductions; mask instructions; permutations; legality checks. Full toolchain integration
+  (assembler, disassembler, editor), execution on the single-cycle processor, undo/redo, register
+  dumps, a GUI vector-register view, the CLI, tests and documentation.
+\item[\tierAA{Compulsory --- A2 Spec completion.}] Fixed-point arithmetic, floating-point vector
+  instructions and reductions, segment and fault-only-first loads/stores, and the standard
+  pseudo-instructions. Together with A1, this is everything needed to claim conformance with the
+  \textbf{V} extension.
+\item[\tierB{Over and above --- B.}] Vector execution in the 5-stage pipelines with vector hazard
+  detection; a vector timing model (lanes, chaining); a rich element-wise vector viewer;
+  configurable VLEN; vector profiling; large-scale randomised differential testing against Spike;
+  a vector unit in the circuit view; further extensions (Zvfh, Zvbb, \dots).
+\item[\textsf{\textbf{\color{kgrey}Out of scope --- C.}}] Privileged vector state (\texttt{mstatus.VS}),
+  trap-based resumption, vector cryptography, compiling C to vector code.
+\end{description}
+\end{keybox}
+
+\begin{table}[htbp]
+\centering\small
+\caption{Key parameters of the planned implementation.}\label{tab:params}
+\begin{tabularx}{\textwidth}{@{}L{4.6cm}Y@{}}
+\toprule
+Specification target & RVV 1.0 as published in the Unprivileged ISA manual, release 20260120, Chapter~30~\cite{spec} \\
+Vector register length & VLEN = 128 bits by default (minimum for \textbf{V}); a single parameter, power of two \\
+Maximum element width & ELEN = 64 bits; SEW $\in\{8,16,32,64\}$, LMUL $\in\{\tfrac18,\tfrac14,\tfrac12,1,2,4,8\}$ \\
+Architectural state & 32 vector registers \texttt{v0}--\texttt{v31}; 7 CSRs (\texttt{vstart}, \texttt{vxsat}, \texttt{vxrm}, \texttt{vcsr}, \texttt{vl}, \texttt{vtype}, \texttt{vlenb}) \\
+Instruction count & 627 assembly mnemonics in \textbf{V} (375 excluding the 252 segment load/store variants): 238 in A1, 389 in A2 (Appendix~\ref{app:inventory}) \\
+Primary execution model & Single-cycle processor (RVSS); vector instructions execute atomically \\
+Pipelined models & Clean rejection in A1; full integration is stretch goal B1 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{Deliverables.} Source code on the \texttt{vector-extension} branch; a GoogleTest suite
+and example programs; three LaTeX/PDF documents (this scope document, a design document and a
+validation report); Markdown user documentation (\file{docs/VECTOR.md}, plus updates to the README,
+\file{docs/CLI.md} and \file{docs/TESTING.md}). Section~\ref{sec:docs} has the full list.
+
+% =====================================================================  2
+\section{Baseline: Kites today}\label{sec:baseline}
+
+\subsection{Architecture overview}
+
+Figure~\ref{fig:arch} shows the parts of Kites that matter for this project. Components this
+project adds are shaded; existing components that need changes are outlined in orange.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  box/.style={draw=kgrey,rounded corners=2pt,fill=white,minimum height=0.85cm,align=center,inner sep=3pt},
+  mod/.style={box,draw=kshould,line width=0.8pt},
+  new/.style={box,fill=knew,draw=kshould,line width=0.8pt},
+  grp/.style={draw=kgrey!60,dashed,rounded corners=4pt,inner sep=6pt},
+  arr/.style={-{Stealth[length=2mm]},kgrey,line width=0.6pt},
+  node distance=0.35cm and 0.35cm]
+  % front ends
+  \node[mod,minimum width=3.6cm] (gui) {Qt GUI: editor, register / memory /\\cache / profiler / circuit tabs};
+  \node[mod,minimum width=2.6cm,right=0.6cm of gui] (cli) {\texttt{kites-cli} / REPL};
+  % assembler
+  \node[mod,below=0.9cm of gui,xshift=-1.6cm] (lex) {Lexer};
+  \node[mod,right=of lex] (par) {Parser +\\syntax forms};
+  \node[mod,right=of par] (gen) {Code generator\\(encoder)};
+  \node[mod,right=of gen] (dis) {Disassembler};
+  \node[new,below=0.45cm of par,xshift=1.1cm,minimum width=4.2cm] (tab) {Vector ISA table (single source of truth)};
+  \node[grp,fit=(lex)(par)(gen)(dis)(tab),label={[font=\sffamily\scriptsize\bfseries,text=kgrey,anchor=south east]north east:Assembler}] (asm) {};
+  % processors
+  \node[box,below=0.9cm of tab,xshift=-3.4cm] (pm) {Processor\\manager};
+  \node[mod,right=of pm] (rvss) {RVSS\\single-cycle};
+  \node[mod,right=of rvss] (rv5) {RV5S $\times$4\\(NH/H, NF/F)};
+  \node[new,right=of rv5] (vu) {Vector unit\\(decode, legality,\\element loop)};
+  \node[grp,fit=(pm)(rvss)(rv5)(vu),label={[font=\sffamily\scriptsize\bfseries,text=kgrey,anchor=south east]north east:Simulator}] (sim) {};
+  % state
+  \node[mod,below=0.8cm of pm,xshift=0.6cm] (rf) {Register file\\GPR, FPR, CSR};
+  \node[new,right=of rf] (vrf) {Vector register\\file + vector CSRs};
+  \node[box,right=of vrf] (mem) {Memory controller\\L1-D, L2, I-cache, RAM};
+  \node[mod,right=of mem] (undo) {Undo/redo\\(StepDelta)};
+  % arrows
+  \draw[arr] (gui.south) -- ++(0,-0.35) -| (lex.north);
+  \draw[arr] (cli.south) -- ++(0,-0.35) -| (lex.north);
+  \draw[arr] (lex) -- (par);
+  \draw[arr] (par) -- (gen);
+  \draw[arr] (tab.north) -- ++(0,0.12) -| (par.south);
+  \draw[arr] (tab.north) -- ++(0,0.12) -| (gen.south);
+  \draw[arr] (tab.north) -- ++(0,0.12) -| (dis.south);
+  \draw[arr] (asm.south) -- node[right,font=\sffamily\tiny]{AssembledProgram} (asm.south |- sim.north);
+  \draw[arr] (pm) -- (rvss);
+  \draw[arr] (rvss) -- (rv5);
+  \draw[arr] (rv5) -- (vu);
+  \draw[arr] (sim.south) -- (sim.south |- vrf.north);
+\end{tikzpicture}
+\caption{Kites components relevant to the vector extension. Shaded boxes are new, orange-outlined
+boxes are modified. The vector unit is shared by all processor models; the vector ISA table drives
+the parser, encoder, disassembler and executor.}\label{fig:arch}
+\end{figure}
+
+\subsection{Feature baseline}
+
+\begin{table}[htbp]
+\centering\small
+\caption{What Kites supports at the baseline commit.}
+\begin{tabularx}{\textwidth}{@{}L{3.4cm}Y@{}}
+\toprule
+Area & Baseline \\
+\midrule
+ISA & RV64I, M, F, D; CSR instructions (\texttt{csrrw}, \dots); a large set of pseudo-instructions, plus user-defined pseudo-instructions \\
+Processor models & \texttt{RVSS} single-cycle; four 5-stage pipelines \texttt{RV5S} \{no hazard detection, hazard detection\} $\times$ \{no forwarding, forwarding\} \\
+Memory system & 64-bit byte-addressed sparse main memory; L1 data cache, L2 cache, instruction cache with configurable replacement policies (including Lua-scripted custom policies) \\
+Tools & Qt~6.9 GUI (editor with highlighting and autocompletion, register/memory/cache/profiler/circuit tabs, breakpoints, undo/redo), headless \texttt{kites-cli} and REPL \\
+Testing & GoogleTest suite (about 20 files) run through CTest, with an optional gcovr coverage target \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Findings that shape the plan}\label{sec:findings}
+
+A review of the code base at commit \texttt{7ddb6f3} found points F1--F15; F16--F19 were found
+during implementation. Each one is an integration risk or a design constraint, addressed in
+Section~\ref{sec:approach}.
+
+\small
+\begin{longtable}{@{}L{0.8cm}L{7.3cm}L{7.0cm}@{}}
+\caption{Findings from the code review (F1--F15, at commit \texttt{7ddb6f3}) and from the implementation (F16--F19).}\label{tab:findings}\\
+\toprule
+ID & Finding & Implication for the vector work \\
+\midrule
+\endfirsthead
+\caption[]{Findings (continued).}\\
+\toprule
+ID & Finding & Implication for the vector work \\
+\midrule
+\endhead
+F1 & \texttt{RegisterFile} stores GPRs and FPRs as \texttt{uint64\_t} arrays and CSRs as a flat 4096-entry array. A \texttt{RegisterType::VECTOR} enum value exists but is unused. Only \texttt{fflags}, \texttt{frm} and \texttt{fcsr} have assembler names. &
+A VLEN-wide vector register file is needed. Vector CSRs must be named, \texttt{vl}/\texttt{vtype}/\texttt{vlenb} must be read-only, and \texttt{vcsr} must be a composite view of \texttt{vxrm} and \texttt{vxsat}. \\
+F2 & \texttt{TokenType::VEC\_REGISTER} is declared but the lexer never produces it. & Placeholder to build on; no existing behaviour to preserve. \\
+F3 & The lexer treats ``\texttt{.}'' as an identifier character, and an unknown identifier after an opcode or comma becomes a \texttt{LABEL\_REF}. &
+\insn{vadd.vv} already lexes as one opcode (good), but \texttt{v0.t} lexes as a single identifier, and \texttt{e32}, \texttt{m1}, \texttt{ta}, \texttt{ma} would become label references. Lexing has to be context-sensitive. \\
+F4 & The parser has one hand-written \texttt{parse\_*} function per syntax form (27 forms, 177 entries in the syntax map). &
+RVV needs about 30 new operand shapes. Writing them in the same style would add thousands of near-duplicate lines, so vector syntax will use a generic operand-pattern matcher instead. \\
+F5 & \texttt{ICUnit} has no mask (\texttt{vm}) field and no vtype field. The opcode buffer holds 20 characters. &
+Add the fields. The longest RVV mnemonic, \insn{vfwcvt.rtz.xu.f.v}, has 17 characters, so it fits. \\
+F6 & Vector loads/stores share the LOAD-FP (\texttt{0000111}) and STORE-FP (\texttt{0100111}) opcodes with \insn{flw}/\insn{fld}/\insn{fsw}/\insn{fsd}; only the \texttt{width} field tells them apart. \texttt{isFInstruction}/\texttt{isDInstruction} already ignore vector widths, but the RVSS control unit sets FP load/store signals from the opcode alone. &
+Without explicit routing, vector memory instructions would silently mis-execute as scalar loads/stores. Decoding must check \texttt{width} before taking the F/D path. Existing F/D tests guard against regressions. \\
+F7 & Undo/redo records \texttt{RegisterChange\{index, type, old, new\}} with 64-bit values. \texttt{MemoryChange} already stores byte vectors. &
+A 128-bit or wider register does not fit. Add a byte-vector \texttt{VectorRegisterChange} and a matching undo/redo case. Vector stores can reuse \texttt{MemoryChange}. \\
+F8 & Scalar FP execution writes the raw exception flags of each instruction into \texttt{fcsr} (0x003). This overwrites the accrued flags and the \texttt{frm} bits and does not touch \texttt{fflags} (0x001). &
+Vector FP accrues its flags into \texttt{fflags} itself (D9); the scalar issue is reported separately. \\
+F9 & The 64-bit high multiplies use \texttt{\_\_int128}, with a TODO noting that MSVC lacks it. & \insn{vmulh*}, \insn{vwmul*} and \insn{vsmul} at SEW=64 need a portable 64$\times$64$\to$128 helper. \\
+F10 & In the pipelines, decode reads GPR or FPR operands and the hazard unit compares the 5-bit \texttt{rs1}/\texttt{rs2}/\texttt{rd} fields as GPR/FPR numbers. & Vector instructions reuse these fields for vector registers, which would cause false hazards and wrong operands. They must be guarded in A1 and integrated properly in B1. \\
+F11 & \texttt{DumpRegisters} writes CSRs (taken from \texttt{csr\_to\_address}), GPRs and FPRs to \texttt{registers\_dump.json}, which both the CLI and the GUI read. & Named vector CSRs will appear in the dump automatically. Vector registers need a new JSON section. \\
+F12 & The profiler groups instructions by \texttt{InstructionType} (R/I/S/B/U/J/F). & Add a \texttt{V\_TYPE} category so vector instructions are not counted as unknown. \\
+F13 & \file{resources/instructions/instructions.json} drives syntax highlighting and autocompletion. & Add a \texttt{VInstruction} list, ideally generated from the ISA table. \\
+F14 & There is no trap model. Runtime errors are C++ exceptions, surfaced through \texttt{runErrorSignal} with the PC mapped back to a source line. & Illegal vector usage reuses this path and stops the run with a precise message (decision D5). \\
+F15 & The README says the pipelines support only I and M, but pipelined F/D support and tests exist. & Documentation drift; fix it while updating the README. \\
+F16 & The scalar FP ALU deviates from the spec: $x/0$ returns NaN instead of $\pm\infty$, the exception-flag bits are in reverse order, a NaN converted to an integer does not give the maximum value, and RMM is not supported. & Vector FP cannot reuse these routines without inheriting the deviations (D9). The scalar issues are reported separately. \\
+F17 & A data label named \texttt{data}, \texttt{text} or \texttt{bss} makes the assembler loop forever or reject the program. & Example programs avoid these names; reported separately. \\
+F18 & Single-precision values are stored zero-extended in the FPRs instead of NaN-boxed. & \insn{vfmv.f.s} follows the same convention, and \texttt{.vf} operands use the low 32 bits. \\
+F19 & \file{test/test_main.cpp} includes \texttt{windows.h} unconditionally, so the tests do not build on macOS or Linux. & Fixed with an \texttt{\#ifdef \_WIN32} guard. \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+% =====================================================================  3
+\section{RVV 1.0 in brief}\label{sec:primer}
+
+This section summarises the parts of the specification~\cite{spec} that drive the plan. It is a
+primer for readers new to RVV, not a replacement for the specification.
+
+\subsection{Programmer's model}
+
+RVV adds 32 vector registers \texttt{v0}--\texttt{v31}, each VLEN bits wide. Software does not
+hard-code VLEN. It requests an \emph{application vector length} (AVL) and a vector type with
+\insn{vsetvli}, and the hardware returns the number of elements \texttt{vl} it will process. A
+loop that processes \texttt{vl} elements per iteration until AVL reaches zero is called
+\emph{strip-mining}. The same binary therefore runs on any VLEN.
+
+\begin{itemize}
+\item \textbf{SEW} (selected element width) is 8, 16, 32 or 64 bits.
+\item \textbf{LMUL} (length multiplier) groups 2, 4 or 8 consecutive registers into one operand, or
+      uses a fraction ($\tfrac12,\tfrac14,\tfrac18$) of a register.
+\item $\mathrm{VLMAX} = \mathrm{LMUL}\times\mathrm{VLEN}/\mathrm{SEW}$, and
+      \texttt{vl} $\le$ VLMAX. Kites will set $\texttt{vl}=\min(\mathrm{AVL},\mathrm{VLMAX})$ (decision D2).
+\item \textbf{Masking}: most instructions accept an optional \texttt{v0.t} operand. Element $i$ is
+      active when bit $i$ of \texttt{v0} is 1.
+\item \textbf{Policies}: tail elements ($i \ge \texttt{vl}$) and masked-off elements are either
+      \emph{undisturbed} (they keep their old value) or \emph{agnostic} (old value or all ones),
+      as selected by \texttt{vta} and \texttt{vma}.
+\item \textbf{vstart} gives the first element to process, so an interrupted instruction can resume.
+      Every vector instruction resets it to 0.
+\end{itemize}
+
+\begin{table}[htbp]
+\centering\small
+\caption{Vector CSRs (URW = user read/write, URO = user read-only).}\label{tab:csrs}
+\begin{tabularx}{\textwidth}{@{}L{1.7cm}L{1.3cm}L{1.1cm}Y@{}}
+\toprule
+CSR & Address & Access & Purpose \\
+\midrule
+\texttt{vstart} & 0x008 & URW & Index of the first element to execute \\
+\texttt{vxsat}  & 0x009 & URW & Fixed-point saturation flag \\
+\texttt{vxrm}   & 0x00A & URW & Fixed-point rounding mode (rnu, rne, rdn, rod) \\
+\texttt{vcsr}   & 0x00F & URW & Composite: \texttt{vxrm} in bits [2:1], \texttt{vxsat} in bit [0] \\
+\texttt{vl}     & 0xC20 & URO & Current vector length \\
+\texttt{vtype}  & 0xC21 & URO & Current vector type: \texttt{vill}, \texttt{vma}, \texttt{vta}, \texttt{vsew}, \texttt{vlmul} \\
+\texttt{vlenb}  & 0xC22 & URO & VLEN/8, the register width in bytes \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{The \texttt{vtype} register.} Bit XLEN$-1$ is \texttt{vill}; bits [XLEN$-2$:8] are reserved;
+bit 7 is \texttt{vma}; bit 6 is \texttt{vta}; bits [5:3] are \texttt{vsew}; bits [2:0] are
+\texttt{vlmul}. \texttt{vsew} = 000/001/010/011 selects SEW = 8/16/32/64.
+\texttt{vlmul} = 101/110/111/000/001/010/011 selects LMUL = $\tfrac18$/$\tfrac14$/$\tfrac12$/1/2/4/8, and 100 is reserved.
+An unsupported setting sets \texttt{vill}, and then every vector instruction except
+\insn{vset\{i\}vl\{i\}} is illegal.
+
+\begin{table}[htbp]
+\centering\small
+\caption{VLMAX for VLEN = 128, ELEN = 64. A dash marks combinations with SEW $>$ LMUL$\times$ELEN, which set \texttt{vill}.}\label{tab:vlmax}
+\begin{tabular}{@{}lccccccc@{}}
+\toprule
+SEW $\backslash$ LMUL & $\tfrac18$ & $\tfrac14$ & $\tfrac12$ & 1 & 2 & 4 & 8 \\
+\midrule
+8  & 2 & 4 & 8 & 16 & 32 & 64 & 128 \\
+16 & --- & 2 & 4 & 8 & 16 & 32 & 64 \\
+32 & --- & --- & 2 & 4 & 8 & 16 & 32 \\
+64 & --- & --- & --- & 2 & 4 & 8 & 16 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Element categories and register groups}
+
+Figure~\ref{fig:elements} shows how an instruction treats each element. Getting these categories
+right for every instruction family is the main source of subtle bugs, so the design (Section
+\ref{sec:loop}) handles them in one shared element loop.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[font=\sffamily\scriptsize,
+  el/.style={draw=kgrey,minimum width=0.78cm,minimum height=0.62cm,inner sep=0pt}]
+  \foreach \i in {0,...,15} {
+    \pgfmathtruncatemacro{\m}{(mod(\i*7+3,4)<2) ? 1 : 0}
+    \ifnum\i<2
+      \node[el,fill=kgrey!25] (e\i) at (\i*0.82,0) {\i};
+    \else\ifnum\i<11
+      \ifnum\m=1
+        \node[el,fill=kblue!30] (e\i) at (\i*0.82,0) {\i};
+      \else
+        \node[el,fill=kshould!25] (e\i) at (\i*0.82,0) {\i};
+      \fi
+    \else
+      \node[el,fill=white,dashed] (e\i) at (\i*0.82,0) {\i};
+    \fi\fi
+    \node[font=\sffamily\tiny,text=kgrey] at (\i*0.82,-0.55) {\ifnum\m=1 1\else 0\fi};
+  }
+  \node[anchor=east,font=\sffamily\tiny,text=kgrey] at (-0.5,-0.55) {mask bit (v0)};
+  \draw[decorate,decoration={brace,amplitude=4pt,mirror},kgrey] ([yshift=-0.9cm]e0.west) -- ([yshift=-0.9cm]e1.east) node[midway,below=4pt]{prestart};
+  \draw[decorate,decoration={brace,amplitude=4pt,mirror},kgrey] ([yshift=-0.9cm]e2.west) -- ([yshift=-0.9cm]e10.east) node[midway,below=4pt]{body: $\texttt{vstart}\le i<\texttt{vl}$};
+  \draw[decorate,decoration={brace,amplitude=4pt,mirror},kgrey] ([yshift=-0.9cm]e11.west) -- ([yshift=-0.9cm]e15.east) node[midway,below=4pt]{tail: $i\ge\texttt{vl}$};
+\end{tikzpicture}
+\caption{Element categories for a masked instruction with VLMAX = 16, \texttt{vstart} = 2 and
+\texttt{vl} = 11. Grey: prestart elements, never written. Blue: active body elements (mask bit 1),
+computed normally. Orange: inactive body elements (mask bit 0), which follow \texttt{vma}. Dashed:
+tail elements, which follow \texttt{vta}.}\label{fig:elements}
+\end{figure}
+
+With LMUL $>1$, an operand is a group of consecutive registers whose first register number must be
+a multiple of LMUL. Element $i$ of a group that starts at \texttt{v}$n$ lives in register
+$n + \lfloor i/(\mathrm{VLEN}/\mathrm{SEW})\rfloor$. Within a register, element~0 occupies the least
+significant bits. Figure~\ref{fig:group} shows an example. Mask values always use a single register,
+one bit per element.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[font=\sffamily\scriptsize,
+  el/.style={draw=kgrey,minimum width=2.2cm,minimum height=0.6cm,fill=kblue!12}]
+  \node[anchor=east] at (-0.2,0) {\texttt{v2}};
+  \node[anchor=east] at (-0.2,-0.75) {\texttt{v3}};
+  \foreach \j/\lab in {0/3,1/2,2/1,3/0} \node[el] at (\j*2.25+1.1,0) {element \lab};
+  \foreach \j/\lab in {0/7,1/6,2/5,3/4} \node[el] at (\j*2.25+1.1,-0.75) {element \lab};
+  \node[text=kgrey] at (0.2,0.55) {bit 127};
+  \node[text=kgrey] at (8.8,0.55) {bit 0};
+\end{tikzpicture}
+\caption{Register group \texttt{v2}--\texttt{v3} with VLEN = 128, SEW = 32 and LMUL = 2
+(VLMAX = 8). An instruction naming \texttt{v3} as a group under LMUL = 2 is illegal.}\label{fig:group}
+\end{figure}
+
+\paragraph{Effective widths.} Loads and stores encode their own element width EEW. The register
+group then uses $\mathrm{EMUL} = (\mathrm{EEW}/\mathrm{SEW})\times\mathrm{LMUL}$, which must lie in
+$[\tfrac18, 8]$. Widening instructions write $2\cdot$SEW elements into $2\cdot$LMUL registers, and
+narrowing instructions read them. The specification restricts how source and destination groups of
+different widths may overlap, and how a masked destination may overlap \texttt{v0}. These rules are
+implemented as explicit, individually tested legality checks (requirement group VL).
+
+\subsection{Instruction encoding}
+
+Arithmetic and configuration instructions use the new major opcode OP-V (\texttt{1010111}).
+\texttt{funct3} selects the operand category: OPIVV \texttt{000}, OPFVV \texttt{001}, OPMVV
+\texttt{010}, OPIVI \texttt{011}, OPIVX \texttt{100}, OPFVF \texttt{101}, OPMVX \texttt{110},
+OPCFG \texttt{111}. Loads and stores reuse LOAD-FP and STORE-FP and are told apart from scalar FP
+accesses by the \texttt{width} field: \texttt{000}, \texttt{101}, \texttt{110}, \texttt{111} mean
+EEW = 8, 16, 32, 64.
+
+\begin{center}
+\small
+\begin{bytefield}[bitwidth=1.0em]{32}
+\bitheader[endianness=big]{0,6,7,11,12,14,15,19,20,24,25,26,31}\\
+\begin{rightwordgroup}{OP-V arithmetic}
+\bitbox{6}{funct6}\bitbox{1}{\tiny vm}\bitbox{5}{vs2}\bitbox{5}{\tiny vs1 / rs1 / imm5}\bitbox{3}{funct3}\bitbox{5}{vd / rd}\bitbox{7}{1010111}
+\end{rightwordgroup}\\[4pt]
+\begin{rightwordgroup}{vsetvli}
+\bitbox{1}{0}\bitbox{11}{zimm[10:0] (vtype)}\bitbox{5}{rs1}\bitbox{3}{111}\bitbox{5}{rd}\bitbox{7}{1010111}
+\end{rightwordgroup}\\[4pt]
+\begin{rightwordgroup}{vsetivli}
+\bitbox{2}{11}\bitbox{10}{zimm[9:0] (vtype)}\bitbox{5}{uimm}\bitbox{3}{111}\bitbox{5}{rd}\bitbox{7}{1010111}
+\end{rightwordgroup}\\[4pt]
+\begin{rightwordgroup}{vsetvl}
+\bitbox{1}{1}\bitbox{6}{000000}\bitbox{5}{rs2}\bitbox{5}{rs1}\bitbox{3}{111}\bitbox{5}{rd}\bitbox{7}{1010111}
+\end{rightwordgroup}\\[4pt]
+\begin{rightwordgroup}{Load / store}
+\bitbox{3}{nf}\bitbox{1}{\tiny mew}\bitbox{2}{\tiny mop}\bitbox{1}{\tiny vm}\bitbox{5}{\tiny lumop / rs2 / vs2}\bitbox{5}{rs1}\bitbox{3}{width}\bitbox{5}{vd / vs3}\bitbox{7}{\tiny 0000111 / 0100111}
+\end{rightwordgroup}
+\end{bytefield}
+\end{center}
+
+For loads and stores, \texttt{mop} selects the addressing mode: \texttt{00} unit-stride, \texttt{01}
+indexed-unordered, \texttt{10} strided, \texttt{11} indexed-ordered. For unit-stride accesses,
+\texttt{lumop}/\texttt{sumop} selects a variant: \texttt{00000} plain, \texttt{01000} whole register,
+\texttt{01011} mask, \texttt{10000} fault-only-first (loads only). \texttt{nf} encodes the number of
+segment fields minus one, and \texttt{mew} must be 0.
+
+\subsection{Extension subsets}
+
+The specification defines embedded subsets Zve32x, Zve32f, Zve64x, Zve64f and Zve64d (Table~\ref{tab:zve}).
+The full \textbf{V} extension depends on Zvl128b (VLEN $\ge 128$) and Zve64d, and on the scalar F and D
+extensions, all of which Kites already has. It includes every vector instruction listed in
+Appendix~\ref{app:inventory}. Half-precision vector FP (Zvfh), vector bit manipulation (Zvbb) and
+vector cryptography are separate extensions and are not part of \textbf{V}.
+
+\begin{table}[htbp]
+\centering\small
+\caption{Standard vector subsets~\cite{spec}.}\label{tab:zve}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Extension & Minimum VLEN & Supported EEW & FP32 & FP64 \\
+\midrule
+Zve32x & 32 & 8, 16, 32 & no & no \\
+Zve32f & 32 & 8, 16, 32 & yes & no \\
+Zve64x & 64 & 8, 16, 32, 64 & no & no \\
+Zve64f & 64 & 8, 16, 32, 64 & yes & no \\
+Zve64d & 64 & 8, 16, 32, 64 & yes & yes \\
+\midrule
+\textbf{V} & 128 & 8, 16, 32, 64 & yes & yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{What vector code looks like}
+
+The strip-mined loop below adds two \texttt{int32} arrays. It is the first
+end-to-end test program.
+
+\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}[language=rvasm]
+# void vvadd(size_t n, const int32_t *a, const int32_t *b, int32_t *c)
+# a0 = n, a1 = a, a2 = b, a3 = c
+vvadd:
+    vsetvli t0, a0, e32, m1, ta, ma   # t0 = vl = min(n, VLMAX)
+    vle32.v v0, (a1)                  # load a[0 .. vl-1]
+    sub     a0, a0, t0                # n -= vl
+    slli    t0, t0, 2                 # bytes processed = vl * 4
+    add     a1, a1, t0
+    vle32.v v1, (a2)                  # load b[0 .. vl-1]
+    add     a2, a2, t0
+    vadd.vv v2, v0, v1                # c = a + b, element-wise
+    vse32.v v2, (a3)
+    add     a3, a3, t0
+    bnez    a0, vvadd                 # loop until all n elements are done
+    ret
+\end{lstlisting}
+\end{minipage}
+
+% =====================================================================  4
+\section{Goals, non-goals and design decisions}\label{sec:goals}
+
+\subsection{Goals}
+\begin{description}[leftmargin=1.2cm,style=sameline,font=\sffamily\bfseries\color{kblue}]
+\item[G1] \textbf{Correctness.} Every supported instruction gives architecturally correct results for
+  every legal combination of SEW, LMUL, \texttt{vl}, \texttt{vstart}, mask and policy, matching an
+  independent reference.
+\item[G2] \textbf{Integration.} Vector code works in every Kites workflow: editing, assembling,
+  running, stepping, undo/redo, breakpoints, register and memory inspection, CLI dumps and profiling.
+\item[G3] \textbf{Determinism.} Identical programs give identical results. Every
+  implementation-defined choice in the spec is fixed and documented (Section~\ref{sec:decisions}).
+\item[G4] \textbf{Robustness.} Illegal or reserved usage is rejected with a precise message that
+  points to the source line. Nothing is silently mis-executed.
+\item[G5] \textbf{No regressions.} Scalar behaviour, scalar performance and all existing tests are
+  unaffected.
+\item[G6] \textbf{Maintainability.} One table-driven definition of the vector ISA is shared by the
+  assembler, disassembler and executor, and the code follows \file{docs/coding_convention.md}.
+\end{description}
+
+\subsection{Non-goals}
+\begin{itemize}
+\item A cycle-accurate model of any particular commercial vector processor.
+\item Compiler support or auto-vectorisation. Kites assembles hand-written assembly.
+\item Supervisor and machine-level features (see Tier C, Section~\ref{sec:tierC}).
+\end{itemize}
+
+\subsection{Design decisions}\label{sec:decisions}
+
+\small
+\begin{longtable}{@{}L{0.8cm}L{6.4cm}L{7.9cm}@{}}
+\caption{Design decisions.}\label{tab:decisions}\\
+\toprule
+ID & Decision & Rationale \\
+\midrule
+\endfirsthead
+\caption[]{Design decisions (continued).}\\
+\toprule
+ID & Decision & Rationale \\
+\midrule
+\endhead
+D1 & VLEN = 128 and ELEN = 64 by default. VLEN is one configuration value (a power of two from 128 to 1024). & 128 is the minimum for \textbf{V} (Zvl128b). With VLEN a parameter from the start, B4 needs only UI work. \\
+D2 & $\texttt{vl} = \min(\mathrm{AVL}, \mathrm{VLMAX})$. & Satisfies all three spec constraints on \texttt{vl} and matches Spike. \\
+D3 & Agnostic elements are left \emph{undisturbed} by default. An ``all ones'' fill can be selected (B4). Mask-destination tails are also left undisturbed. & Both behaviours are legal. Undisturbed is deterministic; the all-ones mode exposes code that depends on agnostic values. \\
+D4 & An unsupported vtype (reserved \texttt{vsew}/\texttt{vlmul}, SEW $>$ LMUL$\times$ELEN, or non-zero reserved bits) sets \texttt{vill}=1, \texttt{vl}=0 and the other \texttt{vtype} bits to 0. The reserved form \insn{vsetvli x0, x0} that would change VLMAX also sets \texttt{vill}. Reset state: \texttt{vill}=1, \texttt{vl}=0. & This is the behaviour the spec prescribes or permits, and it is what the spec recommends for reset. \\
+D5 & Illegal-instruction conditions stop the run with a runtime error that names the violated rule. All checks run \emph{before} any state changes, and results are staged and committed together, so state is unchanged after an error. & Kites has no trap handler (F14). Atomic commit keeps undo/redo and error reporting consistent. \\
+D6 & \texttt{vstart} is honoured (elements below it are untouched) and reset to 0 after every vector instruction. A \texttt{vstart} above the largest element index is rejected. & Spec behaviour. Without traps, a non-zero \texttt{vstart} only arises from an explicit CSR write. \\
+D7 & Each vector instruction executes atomically in one simulator step. In RVSS it retires as one instruction in one cycle. & Matches the single-cycle abstraction. Realistic timing is stretch goal B2. \\
+D8 & Element memory accesses go through \texttt{MemoryController} one element at a time, in ascending element order. Misaligned element addresses are allowed. & Caches see vector traffic. Ascending order satisfies the indexed-ordered semantics and is a valid unordered order. Kites performs no alignment checks for scalar accesses, so allowing misaligned elements is consistent. \\
+D9 & Vector FP uses its own element routines: host IEEE arithmetic with the rounding mode from \texttt{frm}, flags accrued into \texttt{fflags} in the RISC-V bit layout, and the RISC-V rules applied explicitly (canonical NaN, minimumNumber/maximumNumber, saturating float-to-integer conversion, round-to-odd, bit-exact 7-bit estimates). & The scalar FP routines deviate from the spec (F16). RMM rounds ties to even in arithmetic because the host has no such mode; conversions to integer honour RMM. \\
+D10 & One vector ISA table (mnemonic, encoding, operand pattern, semantic class, flags) drives the encoder, parser, disassembler, executor dispatch, \file{instructions.json} and the instruction list in the documentation. It is cross-checked automatically against \texttt{riscv-opcodes}~\cite{opcodes}. & Avoids the duplication noted in F4 and keeps the assembler, disassembler and executor consistent by construction. \\
+D11 & Assembly syntax follows GNU \texttt{as} and LLVM: spec operand order, a ``\texttt{, v0.t}'' mask suffix, vtype written as ``\texttt{e32, m2, ta, ma}'', and \texttt{tu, mu} when the policy is omitted. & Source compatibility with standard toolchains; LLVM can produce golden encodings. \\
+D12 & Until B1 is done, the 5-stage models stop with ``vector instructions are supported only on the single-cycle processor'' when they decode a vector instruction. & Guarantees no silent mis-execution (F10) without blocking A1. \\
+D13 & New code lives in \file{src/processor/vector/} and \file{src/assembler/parse_formats/v_formats.cpp}. Existing files receive only small, well-defined hooks. & Limits regression risk and keeps the change reviewable. \\
+D14 & Mnemonics that are not yet implemented are rejected by the assembler with ``not supported''. & Partial support never mis-executes. \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+% =====================================================================  5
+\section{Scope}\label{sec:scope}
+
+The work is split into four tiers:
+
+\begin{itemize}
+\item \tierA{A1 --- Compulsory core}: the minimum for Kites to support RVV integer programs correctly,
+  end to end.
+\item \tierAA{A2 --- Compulsory spec completion}: the rest of the \textbf{V} extension. A1 + A2 is
+  what ``Kites supports the V extension'' means.
+\item \tierB{B --- Over and above}: extensions beyond conformance, in priority order.
+\item \textsf{\textbf{\color{kgrey}C --- Out of scope}}: explicitly not done.
+\end{itemize}
+
+Instruction counts refer to Appendix~\ref{app:inventory}.
+
+\subsection{Tier A1 --- compulsory core}
+
+\small
+\begin{longtable}{@{}L{1.0cm}L{3.4cm}L{10.7cm}@{}}
+\caption{Tier A1 items: the compulsory core.}\label{tab:tierA1}\\
+\toprule
+ID & Item & Contents \\
+\midrule
+\endfirsthead
+\caption[]{Tier A1 items: the compulsory core (continued).}\\
+\toprule
+ID & Item & Contents \\
+\midrule
+\endhead
+A1.1 & Vector architectural state & 32 $\times$ VLEN register file with element and register-group accessors. CSRs \texttt{vstart}, \texttt{vxsat}, \texttt{vxrm}, \texttt{vcsr} (composite view), \texttt{vl}, \texttt{vtype}, \texttt{vlenb}, with URW/URO enforcement and assembler names. Reset state as in D4. \\
+A1.2 & Configuration instructions & \insn{vsetvli}, \insn{vsetivli}, \insn{vsetvl}. AVL rules, including the special \texttt{rs1}=\texttt{x0} cases. \texttt{vill} handling (3 mnemonics). \\
+A1.3 & Loads and stores (non-segment) & Unit-stride, strided (including zero and negative strides), indexed-ordered and indexed-unordered, mask (\insn{vlm.v}/\insn{vsm.v}) and whole-register forms, for EEW 8--64, with EEW/EMUL legality checks (54 mnemonics). \\
+A1.4 & Integer arithmetic & Add/sub/reverse-sub; widening add/sub (including \texttt{.w} forms); zero/sign extension; add-with-carry and subtract-with-borrow; bitwise; shifts; narrowing shifts; compares; min/max; multiply and high multiply; divide/remainder (RISC-V divide-by-zero and overflow results); widening multiply; single-width and widening multiply-add; merge; \insn{vmv.v.*} (139 mnemonics). \\
+A1.5 & Masking and policies & \texttt{v0.t} masking for every maskable instruction; \texttt{vta}/\texttt{vma}; prestart, body and tail handling (Figure~\ref{fig:elements}); mask register layout. \\
+A1.6 & Integer reductions & Single-width and widening reductions (10 mnemonics). \\
+A1.7 & Mask instructions & Eight mask-logical operations, \insn{vcpop.m}, \insn{vfirst.m}, \insn{vmsbf/vmsif/vmsof.m}, \insn{viota.m}, \insn{vid.v} (15 mnemonics). \\
+A1.8 & Integer permutations & \insn{vmv.x.s}, \insn{vmv.s.x}, slides (up, down, 1up, 1down), \insn{vrgather} (\texttt{.vv}/\texttt{.vx}/\texttt{.vi}), \insn{vrgatherei16.vv}, \insn{vcompress.vm}, \insn{vmv<nr>r.v} (17 mnemonics). \\
+A1.9 & Legality and errors & Register-group alignment; overlap rules (widening, narrowing, mask, \texttt{v0}); EMUL range; reserved encodings (\texttt{mew}=1, reserved widths and \texttt{funct6} values); \texttt{vill}; \texttt{vstart} range; writes to read-only CSRs. Each is reported as a runtime error with a source line (D5). \\
+A1.10 & Assembler and editor & Lexer tokens (\texttt{v0}--\texttt{v31}, \texttt{v0.t}, vtype fields); operand patterns; immediate range checks (simm5, uimm5, \texttt{vsetivli} uimm and zimm); encoder; disassembler; error messages that show the expected syntax; \file{instructions.json} entries for highlighting and autocompletion; \insn{csrr}/\insn{csrw}/\insn{csrs}/\insn{csrc} pseudo-instructions so programs can read \texttt{vl}, \texttt{vtype} and \texttt{vlenb}. \\
+A1.11 & Single-cycle integration & Decode routing (OP-V, plus vector LOAD-FP/STORE-FP selected by \texttt{width}); execution through the vector unit; atomic commit; \texttt{vstart} reset; instruction and cycle counting; undo/redo of vector register, CSR and memory changes; reset; breakpoints and stepping inside vector loops. \\
+A1.12 & Pipelined models & Clean rejection of vector instructions (D12), with tests on all four variants. \\
+A1.13 & Observability & \texttt{registers\_dump.json} with vector registers and vector CSRs; CLI documentation; a \emph{Vector} section in the GUI register view (\texttt{v0}--\texttt{v31} in hex, plus vector CSRs, with change highlighting); a \texttt{V-Type} category in the profiler. \\
+A1.14 & Validation & Everything in Section~\ref{sec:validation} that applies to A1 items, including the full regression suite. \\
+A1.15 & Documentation & Everything in Section~\ref{sec:docs} that applies to A1 items. \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\subsection{Tier A2 --- compulsory spec completion}
+
+\small
+\begin{longtable}{@{}L{1.0cm}L{3.4cm}L{10.7cm}@{}}
+\caption{Tier A2 items: compulsory spec completion.}\label{tab:tierA2}\\
+\toprule
+ID & Item & Contents \\
+\midrule
+\endfirsthead
+\caption[]{Tier A2 items: compulsory spec completion (continued).}\\
+\toprule
+ID & Item & Contents \\
+\midrule
+\endhead
+A2.1 & Fixed-point arithmetic & Saturating add/sub; averaging add/sub; fractional multiply \insn{vsmul}; scaling shifts; narrowing clips. \texttt{vxrm} rounding modes rnu, rne, rdn, rod, and \texttt{vxsat} (32 mnemonics). \\
+A2.2 & Floating-point arithmetic & For SEW = 32 (F) and SEW = 64 (D): add/sub/reverse-sub; widening add/sub; mul/div/reverse-div; widening mul; 8 single-width and 4 widening fused multiply-adds; sqrt; \insn{vfrsqrt7}/\insn{vfrec7} (bit-exact spec tables); min/max; sign injection; compares; classify; merge; \insn{vfmv.v.f}; single-width, widening and narrowing conversions, including \texttt{rtz} and \texttt{rod} forms (91 mnemonics). \\
+A2.3 & FP reductions and permutations & Ordered and unordered sum, min and max reductions, plus their widening forms (6); \insn{vfmv.f.s}, \insn{vfmv.s.f}, \insn{vfslide1up/down.vf} (4). \\
+A2.4 & Segment and fault-only-first & Segment loads and stores with NFIELDS 2--8 in every addressing mode (252 mnemonics). Fault-only-first loads \insn{vle<eew>ff.v} (4), which trim \texttt{vl} when a later element would fault (in Kites, an out-of-range address). \\
+A2.5 & Standard pseudo-instructions & \insn{vneg.v}, \insn{vnot.v}, \insn{vwcvt(u).x.x.v}, \insn{vncvt.x.x.w}, \insn{vmsgt(u).vv}, \insn{vmsge(u).vv}, \insn{vmslt(u).vi}, \insn{vmsge(u).vi}, the multi-instruction \insn{vmsge(u).vx} expansions, \insn{vfneg.v}, \insn{vfabs.v}, \insn{vmfgt/vmfge.vv}, \insn{vmmv/vmclr/vmset/vmnot.m}, \insn{vl<nr>r.v}. \\
+A2.6 & Validation and documentation & As for A1, for every A2 item. \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\subsection{Tier B --- over and above (in priority order)}
+
+\small
+\begin{longtable}{@{}L{0.7cm}L{3.4cm}L{9.6cm}L{1.0cm}@{}}
+\caption{Tier B items, in priority order.}\label{tab:tierB}\\
+\toprule
+ID & Item & Contents & Needs \\
+\midrule
+\endfirsthead
+\caption[]{Tier B items (continued).}\\
+\toprule
+ID & Item & Contents & Needs \\
+\midrule
+\endhead
+B1 & Pipelined vector execution & Vector instructions flow through IF/ID/EX/MEM/WB in all four RV5S models. Group-aware hazard detection on vector registers and on \texttt{vl}/\texttt{vtype}; stalls in the hazard-detecting models; forwarding of vector results in the forwarding models; scalar results (\insn{vmv.x.s}, \insn{vcpop.m}, \insn{vsetvl} \texttt{rd}) through the existing paths; pipeline view labels. & A1 \\
+B2 & Vector timing model & Configurable number of lanes $L$. An instruction occupies EX for $\lceil\texttt{vl}/L\rceil$ cycles (chime model), with optional chaining. Memory cost per cache line touched. Reports cycles, CPI and speed-up over equivalent scalar code. & B1 \\
+B3 & Rich vector register viewer & Per-element view with an SEW selector, signed/unsigned/hex/float formats, LMUL group outlines, \texttt{v0} as mask bits, changed-element highlighting, a \texttt{vtype} decoder, and in-place editing. & A1.13 \\
+B4 & Configurability & VLEN (128--1024) and agnostic fill policy in the Settings dialog and as CLI flags (\texttt{--vlen}, \texttt{--vector-agnostic}), persisted in the configuration. & D1 \\
+B5 & Vector profiling & Vector instruction mix; elements processed; average \texttt{vl} and active-element ratio; bytes moved by unit-stride, strided and indexed accesses; cache hit rate per access pattern. & A1 \\
+B6 & Randomised differential testing & Constrained random generator of vector programs; run on Spike and Kites and compare architectural state; CI job; import of \texttt{riscv-vector-tests}~\cite{rvvtests} cases. & A1 \\
+B7 & Vector unit in the circuit view & Single-cycle diagram extended with the vector register file, vector ALU, mask unit and vector load/store unit, with per-instruction wire highlighting. & A1 \\
+B8 & More extensions & Zvfh (half-precision vector FP; needs scalar Zfh/Zfhmin), Zvbb/Zvkb, Zvbc; selectable Zve32x/Zve64x/Zve64d subset modes for embedded profiles. & A2 \\
+B9 & CLI/REPL vector commands & Print a vector register as typed elements, set a vector register, show the decoded \texttt{vtype}; element-format options for dumps. & A1 \\
+B10 & Custom vector pseudo-instructions & Vector support in the custom pseudo-instruction manager, so users can define vector macros. & A2.5 \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\subsection{Tier C --- out of scope}\label{sec:tierC}
+\begin{itemize}
+\item Privileged-architecture vector state: the \texttt{mstatus.VS} field, dirty tracking and context-switch support.
+\item Trap-based resumption beyond D6, since Kites has no trap handler.
+\item Vector cryptography (Zvk*) and other non-\textbf{V} vector extensions, except those listed in B8.
+\item Loading externally compiled ELF binaries, and compiling C to vector code.
+\item Cycle-accurate models of specific commercial cores; multi-hart memory-ordering effects of vector accesses.
+\item Misaligned-address exceptions (see D8) and virtual memory.
+\end{itemize}
+
+% =====================================================================  6
+\section{Requirements and acceptance criteria}\label{sec:requirements}
+
+Each requirement has an ID, a tier and a verification method: \textbf{T} = automated test,
+\textbf{R} = review/inspection, \textbf{D} = demonstration. Test names carry requirement IDs, so the
+validation report can trace every requirement to its tests (Section~\ref{sec:trace}).
+
+\small
+\begin{longtable}{@{}L{1.2cm}L{11.1cm}L{1.2cm}L{0.9cm}@{}}
+\caption{Requirements, grouped by area.}\label{tab:reqs}\\
+\toprule
+ID & Requirement & Tier & Verif. \\
+\midrule
+\endfirsthead
+\caption[]{Requirements, grouped by area (continued).}\\
+\toprule
+ID & Requirement & Tier & Verif. \\
+\midrule
+\endhead
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}State and CSRs (VS)}}}\\
+VS-01 & Kites shall provide 32 vector registers of VLEN bits, with VLEN set by one configuration value (default 128). & A1 & T \\
+VS-02 & The seven vector CSRs shall exist at their spec addresses with URW/URO access. Writing \texttt{vl}, \texttt{vtype} or \texttt{vlenb} shall be an illegal instruction. & A1 & T \\
+VS-03 & \texttt{vcsr} shall read as \texttt{(vxrm $\ll$ 1) | vxsat}, and writing it shall update both fields. & A1 & T \\
+VS-04 & After reset: \texttt{vtype.vill}=1, \texttt{vl}=0, \texttt{vstart}=0, \texttt{vxrm}=0, \texttt{vxsat}=0, and all vector registers zero. & A1 & T \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Configuration (VC)}}}\\
+VC-01 & \insn{vsetvli}, \insn{vsetivli} and \insn{vsetvl} shall compute \texttt{vl} = min(AVL, VLMAX) and write \texttt{vl} to \texttt{rd}. & A1 & T \\
+VC-02 & \texttt{rs1}=\texttt{x0}, \texttt{rd}$\ne$\texttt{x0} shall request VLMAX. \texttt{rs1}=\texttt{rd}=\texttt{x0} shall keep \texttt{vl}; if VLMAX would change, it shall set \texttt{vill} (D4). & A1 & T \\
+VC-03 & Unsupported vtype values shall set \texttt{vill}=1 and \texttt{vl}=0 (D4). & A1 & T \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Memory (VM)}}}\\
+VM-01 & Unit-stride, strided, indexed (ordered and unordered), mask and whole-register loads and stores shall access exactly the bytes defined by the spec for every EEW, EMUL, \texttt{vl}, \texttt{vstart} and mask. & A1 & T \\
+VM-02 & Strided accesses shall support zero, negative and non-element-multiple strides. & A1 & T \\
+VM-03 & Mask loads and stores shall use EEW = 8 and \texttt{evl} = $\lceil\texttt{vl}/8\rceil$. Whole-register forms shall ignore \texttt{vtype} and \texttt{vl}. & A1 & T \\
+VM-04 & Every vector memory access shall go through \texttt{MemoryController} (cache statistics reflect it), and stores shall be recorded for undo. & A1 & T \\
+VM-05 & Segment loads and stores (NFIELDS 2--8) and fault-only-first loads shall follow the spec, including \texttt{vl} trimming. & A2 & T \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Arithmetic and data movement (VA)}}}\\
+VA-01 & Every A1 integer, reduction, mask and permutation instruction shall match the reference model bit-exactly for every legal SEW/LMUL. & A1 & T \\
+VA-02 & Division by zero and signed overflow shall give the RISC-V defined results (quotient all ones or $-1$, remainder = dividend; overflow quotient = dividend, remainder 0). & A1 & T \\
+VA-03 & Fixed-point instructions shall implement all four \texttt{vxrm} modes and set \texttt{vxsat} exactly when saturation occurs. & A2 & T \\
+VA-04 & FP instructions shall honour dynamic \texttt{frm}, produce canonical NaNs, accrue \texttt{fflags}, and match the reference bit-exactly. The exception is \insn{vfredusum}/\insn{vfwredusum}, where any summation order is legal (Section~\ref{sec:oracles}). & A2 & T \\
+VA-05 & \insn{vfrec7.v} and \insn{vfrsqrt7.v} shall reproduce the spec lookup tables exactly, including special cases. & A2 & T \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Masking and policies (VP)}}}\\
+VP-01 & Inactive body elements shall follow \texttt{vma}, and tail elements shall follow \texttt{vta}, using the configured agnostic fill (D3). & A1 & T \\
+VP-02 & Prestart elements ($i<\texttt{vstart}$) shall never be modified, and \texttt{vstart} shall be 0 after every vector instruction. & A1 & T \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Legality (VL)}}}\\
+VL-01 & Every rule in A1.9 shall stop execution with a message that names the rule, the instruction and the source line, and shall leave architectural state unchanged. & A1 & T \\
+VL-02 & Executing any vector instruction except \insn{vset*} while \texttt{vill}=1 shall be illegal. & A1 & T \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Assembler and editor (AS)}}}\\
+AS-01 & Every in-scope mnemonic, in every operand form (masked and unmasked, all immediates), shall assemble to the same 32-bit word as LLVM \texttt{llvm-mc}~\cite{llvm}. & A1/A2 & T \\
+AS-02 & The disassembler shall print canonical syntax, and assembling its output shall reproduce the same word (round trip). & A1/A2 & T \\
+AS-03 & Syntax errors, unknown registers and out-of-range immediates shall give an error with the line, column and expected syntax. & A1 & T \\
+AS-04 & Labels whose names look like vtype fields (for example \texttt{ta:} or \texttt{e32:}) shall still work. & A1 & T \\
+AS-05 & Vector mnemonics and registers shall be syntax-highlighted and offered by autocompletion. & A1 & D \\
+AS-06 & The standard vector pseudo-instructions shall expand as specified. & A2 & T \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Simulator integration (SI)}}}\\
+SI-01 & On RVSS, a vector instruction shall retire as one instruction in one cycle (D7). & A1 & T \\
+SI-02 & Undo after any vector instruction shall restore registers, vector registers, CSRs and memory bit-exactly, and redo shall reapply them. & A1 & T \\
+SI-03 & Scalar F/D loads and stores shall be unaffected by the shared opcodes (F6). & A1 & T \\
+SI-04 & On the 5-stage models, a vector instruction shall stop the run with the D12 message (A1). With B1, it shall execute correctly. & A1 / B1 & T \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Observability (OB)}}}\\
+OB-01 & \texttt{registers\_dump.json} shall contain the vector CSRs and a \texttt{vector\_registers} section, with a documented byte-order convention. & A1 & T \\
+OB-02 & The GUI register view shall show \texttt{v0}--\texttt{v31} and the vector CSRs, and shall update on step, run, undo, redo and reset. & A1 & D \\
+OB-03 & The profiler shall count vector instructions as \texttt{V-Type}. & A1 & T \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Non-functional (NF)}}}\\
+NF-01 & All existing tests shall pass, and run time on existing scalar examples shall stay within $\pm$5\% of the baseline. & A1 & T \\
+NF-02 & The code shall build and pass tests on macOS (Clang) and Linux (GCC), and shall not rely on \texttt{\_\_int128} without a portable fallback. & A1 & T \\
+NF-03 & New code shall follow \file{docs/coding_convention.md} and carry Doxygen comments for public interfaces. & A1 & R \\
+NF-04 & Line coverage of the new vector code shall be at least 90\%, and branch coverage at least 75\%. & A1/A2 & T \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+% =====================================================================  7
+\section{Technical approach}\label{sec:approach}
+
+This section fixes the architecture at the level needed for planning. The design document will cover
+data structures, algorithms and every legality rule in detail.
+
+\subsection{Module structure}
+
+\small
+\begin{longtable}{@{}L{5.6cm}L{9.5cm}@{}}
+\caption{New modules and files.}\label{tab:modules}\\
+\toprule
+New file or folder & Responsibility \\
+\midrule
+\endfirsthead
+\caption[]{New modules and files (continued).}\\
+\toprule
+New file or folder & Responsibility \\
+\midrule
+\endhead
+\file{src/processor/vector/vector_config.h}, \file{.cpp} & VLEN/ELEN parameters and the agnostic-fill policy \\
+\file{src/processor/vector/vtype.h}, \file{.cpp} & Decoding, encoding and validation of \texttt{vtype}; VLMAX \\
+\file{src/processor/vector/vector_isa.h}, \file{.cpp} & The vector ISA table (D10): lookup by mnemonic, decoding, operand patterns, disassembly, expected-syntax text, pseudo-instruction names \\
+\file{src/processor/vector/vector_isa_table.inc} & Encodings generated from \texttt{riscv-opcodes} \\
+\file{src/processor/vector/vector_unit.h}, \file{.cpp} & \texttt{rvv::execute}: dispatch, legality checks, \texttt{vset\{i\}vl\{i\}}, atomic commit with undo records; exception types \\
+\file{src/processor/vector/vector_exec.h} & Execution state shared by the instruction groups: operand snapshot, working copy, element access, policies, legality helpers \\
+\file{src/processor/vector/vector_exec_integer.cpp} & Integer, fixed-point, mask, reduction and permutation instructions \\
+\file{src/processor/vector/vector_exec_memory.cpp} & Loads and stores \\
+\file{src/processor/vector/vector_exec_float.cpp} & Floating-point instructions \\
+\file{src/assembler/parse_formats/v_formats.cpp} & Generic operand-pattern parser for vector syntax \\
+\file{tools/vector/} (Python) & Cross-check against \texttt{riscv-opcodes}; golden-encoding generation; Spike comparison; \file{instructions.json} generation \\
+\file{test/vector/}, \file{examples/vector/} & Test suites and example programs \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\subsection{Execution flow}
+
+Figure~\ref{fig:flow} shows where the vector unit sits in the single-cycle processor.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\sffamily\scriptsize,
+  box/.style={draw=kgrey,rounded corners=2pt,fill=white,minimum height=0.8cm,align=center,inner sep=3pt},
+  new/.style={box,fill=knew,draw=kshould,line width=0.8pt},
+  dec/.style={diamond,draw=kgrey,aspect=2.2,inner sep=1pt,align=center,fill=klight},
+  arr/.style={-{Stealth[length=2mm]},kgrey,line width=0.6pt}, node distance=0.45cm]
+  \node[box] (f) {Fetch};
+  \node[box,right=of f] (d) {Decode\\(control unit)};
+  \node[dec,right=of d] (q) {vector?};
+  \node[new,right=0.6cm of q] (vd) {Vector decoder\\+ legality checks};
+  \node[new,right=of vd] (lp) {Element loop\\(stage results)};
+  \node[new,right=of lp] (cm) {Commit + record\\StepDelta; vstart$\leftarrow$0};
+  \node[box,below=0.9cm of q] (sc) {Existing scalar path\\(Execute / Memory / WriteBack)};
+  \node[box,below=0.9cm of lp] (err) {Runtime error\\(state unchanged)};
+  \node[box,below=0.9cm of cm] (gui) {Signals $\rightarrow$ GUI,\\dumps, profiler};
+  \draw[arr] (f) -- (d); \draw[arr] (d) -- (q);
+  \draw[arr] (q) -- node[above]{yes} (vd);
+  \draw[arr] (q) -- node[right]{no} (sc);
+  \draw[arr] (vd) -- (lp); \draw[arr] (lp) -- (cm);
+  \draw[arr] (vd.south) |- node[pos=0.3,left]{illegal} (err.west);
+  \draw[arr] (cm) -- (gui);
+\end{tikzpicture}
+\caption{How RVSS executes an instruction after the change. Vector instructions are routed to the
+vector unit before the F/D checks, which closes the opcode-sharing hazard in F6.}\label{fig:flow}
+\end{figure}
+
+\subsection{The shared element loop}\label{sec:loop}
+
+Every non-memory family runs through one loop, so masking, tail and \texttt{vstart} handling are
+written once:
+
+\begin{lstlisting}[language={},morekeywords={for,if,else,continue,throw}]
+checkLegality(insn, vtype)                 # throws before any state change (D5)
+for i in 0 .. VLMAX-1:
+    if i < vstart:                continue          # prestart: never written
+    if i >= vl:                   applyTail(i)      # vta policy (D3)
+    else if masked and !v0.bit(i): applyInactive(i) # vma policy (D3)
+    else:                         body(i)           # family-specific semantics
+commitStagedWrites(); recordDelta(); vstart = 0
+\end{lstlisting}
+
+Reductions, mask-producing instructions, scalar moves, \insn{vcompress} and memory instructions
+specialise this loop (for example, the destination EEW is 1 bit for compares, and a reduction writes
+only element~0). Element loops are $O(\mathrm{VLMAX})$, which is at most 128 iterations for
+VLEN = 128, so they have no measurable effect on simulator speed.
+
+\subsection{Integration with existing subsystems}
+
+\begin{description}[style=sameline,leftmargin=0pt,font=\sffamily\bfseries\color{kblue}]
+\item[Assembler.] New token types \texttt{VEC\_REGISTER}, \texttt{VEC\_MASK} (\texttt{v0.t}) and
+  \texttt{VTYPE\_FIELD}. Vtype fields are recognised only in operand position after
+  \insn{vsetvli}/\insn{vsetivli} (AS-04). \texttt{ICUnit} gains \texttt{vm}, a vtype immediate and
+  \texttt{nf}. Each table entry declares an operand pattern such as
+  \texttt{"vd, vs2, vs1 [, vm]"}. The generic parser matches tokens against it, checks immediate
+  ranges, fills the \texttt{ICUnit}, and builds the ``expected syntax'' text for errors from the
+  same pattern.
+\item[Processor.] The vector registers live in \texttt{RegisterFile}, next to the GPRs, FPRs and
+  CSRs, so every processor model has them. The vector unit is a stateless function,
+  \texttt{rvv::execute}, which RVSS calls from \texttt{Execute}. The 5-stage models get a
+  decode-stage guard (D12), and B1 replaces it with real pipeline support.
+\item[Undo/redo.] \texttt{StepDelta} gains \texttt{std::vector<VectorRegisterChange>}, holding
+  old and new bytes for changed registers only. Vector CSR changes reuse the existing CSR records,
+  and vector stores reuse \texttt{MemoryChange} (one record per contiguous byte run). At VLEN = 128,
+  the worst-case undo footprint is about 1~KB per step.
+\item[Observability.] \texttt{DumpRegisters} gains a \texttt{vector\_registers} section, written
+  as hex strings with element~0 in the least significant (rightmost) digits. The register view gets
+  a third collapsible \emph{Vector} section next to ``General Purpose'' and ``Floating Point''. The
+  profiler gets \texttt{V-Type}.
+\item[Portability.] The 64$\times$64$\to$128 multiply helper uses only 64-bit arithmetic, so it
+  builds with any compiler (NF-02).
+\end{description}
+
+Appendix~\ref{app:impact} maps every existing file that will change.
+
+% =====================================================================  8
+\section{Implementation plan}\label{sec:plan}
+
+\subsection{Phases}
+
+Phases are ordered by dependency. Each phase ships with its own tests and ends with the full
+suite (old and new) passing; P6 adds system-level validation on top.
+
+\small
+\begin{longtable}{@{}L{1.0cm}L{6.2cm}L{6.4cm}L{1.3cm}@{}}
+\caption{Implementation phases.}\label{tab:phases}\\
+\toprule
+Phase & Content & Exit criteria & Tier \\
+\midrule
+\endfirsthead
+\caption[]{Implementation phases (continued).}\\
+\toprule
+Phase & Content & Exit criteria & Tier \\
+\midrule
+\endhead
+P0 & Tooling: LLVM (\texttt{llvm-mc}) and Spike; baseline build and test run; test skeletons. & Baseline results recorded. & --- \\
+P1 & Foundations: vector register file, CSRs, \texttt{vtype} helpers, ISA table with \texttt{riscv-opcodes} cross-check, lexer and generic parser, encoder, disassembler, RVSS routing, atomic commit, undo/redo, dumps, pipeline guard, \insn{csrr} pseudo-instructions. & \insn{vset*} works end to end in GUI and CLI; \texttt{vtype}/VLMAX unit tests and undo property test pass. & A1 \\
+P2 & Memory: unit-stride, strided, indexed, mask and whole-register loads and stores; EEW/EMUL legality. & \texttt{vvadd} and \texttt{memcpy} examples run; memory test matrix passes. & A1 \\
+P3 & Integer arithmetic, compares, merge/move, widening/narrowing, multiply/divide/multiply-add, carry; masking and policy engine. & Integer test matrix passes for all 22 legal SEW/LMUL pairs. & A1 \\
+P4 & Reductions, mask instructions, permutations; GUI vector section; profiler \texttt{V-Type}; A1 documentation. & Every A1 mnemonic has encoding and semantic tests; \file{docs/VECTOR.md} drafted. & A1 \\
+P5 & Fixed-point; FP arithmetic, conversions, reductions and permutations; segment and fault-only-first; pseudo-instructions. & Every mnemonic in Appendix~\ref{app:inventory} has tests; FP edge-case suite passes. & A2 \\
+P6 & System validation and documentation: Spike differential runs, coverage, negative tests, performance check, cross-platform build; design document and validation report; README, CLI and TESTING updates. & All quality gates in Section~\ref{sec:gates} met. & A1, A2 \\
+P7 & Stretch goals, in order B1, B3, B6, B2, B4, B5, \dots & Each B item meets its own definition of done. & B \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\subsection{Ways of working}
+\begin{itemize}
+\item \textbf{Branches:} \texttt{vector-extension} is the integration branch; the final PR goes to \texttt{main}.
+\item \textbf{Commits:} small and focused, following the repository's \texttt{type : summary} style
+      (\texttt{feat}, \texttt{fix}, \texttt{test}, \texttt{docs}, \texttt{refac}, \texttt{build}).
+\item \textbf{Definition of done:} code, tests and documentation updated; full suite green;
+      \texttt{clang-format} applied (UI \texttt{.ui} files excepted, as the coding convention requires);
+      requirement IDs referenced in test names.
+\end{itemize}
+
+% =====================================================================  9
+\section{Validation and verification plan}\label{sec:validation}
+
+\subsection{Principles}
+\begin{enumerate}
+\item \textbf{Independent oracles.} Expected values never come from the code under test. They come
+      from Spike, LLVM, or a deliberately simple reference model written separately in the test code.
+\item \textbf{Complete coverage of the ISA.} Every in-scope mnemonic has at least one encoding test
+      and one semantic test. A meta-test walks the ISA table and fails if any entry has no tests.
+\item \textbf{Positive and negative.} Correct results for legal use, and correct rejection of
+      illegal use with state unchanged.
+\item \textbf{Automated and repeatable.} Everything except the GUI checklist runs under CTest, using
+      the existing presets.
+\item \textbf{Traceable.} Test names carry requirement IDs, and the validation report contains a
+      traceability matrix.
+\end{enumerate}
+
+\subsection{Test levels}
+
+\small
+\begin{longtable}{@{}L{0.9cm}L{2.7cm}L{7.8cm}L{2.9cm}@{}}
+\caption{Test levels.}\label{tab:levels}\\
+\toprule
+Level & Focus & What and how & Oracle / tool \\
+\midrule
+\endfirsthead
+\caption[]{Test levels (continued).}\\
+\toprule
+Level & Focus & What and how & Oracle / tool \\
+\midrule
+\endhead
+L1 & Units & \texttt{vtype} decode/encode, VLMAX/EMUL tables, legality predicates, element and group accessors, \texttt{vxrm} rounding helper, saturation, \texttt{rec7}/\texttt{rsqrt7} tables, 128-bit multiply helper. & Spec tables; hand-computed values \\
+L2 & Assembler and disassembler & For every mnemonic and operand form: assemble and compare the word with the golden encoding; boundary immediates; masked and unmasked forms; disassembler round trip; error cases (bad register, out-of-range immediate, missing operand, \texttt{v0.t} where not allowed); labels named like vtype fields. & \texttt{llvm-mc}~\cite{llvm} encodings; \texttt{riscv-opcodes}~\cite{opcodes} \\
+L3 & Instruction semantics & Parameterised GoogleTests per family over the configuration matrix (Table~\ref{tab:matrix}), with edge-value operands: 0, $\pm1$, signed min/max, unsigned max; for FP, $\pm0$, $\pm\infty$, quiet and signalling NaN, subnormals and rounding ties. & Independent C++ reference model; Spike golden vectors for spot checks \\
+L4 & Legality & One test per rule in A1.9: the instruction raises the right error and leaves state (registers, vector registers, CSRs, memory) bit-identical. & Spec rules \\
+L5 & Programs & Example programs (Section~\ref{sec:examples}) run on RVSS through \texttt{assemble()} and \texttt{DebugRun()}. Results are checked against expected memory and registers, and against scalar versions of the same algorithm also run in Kites. & Scalar Kites run; Spike \\
+L6 & Differential vs Spike & The same programs on Spike (\texttt{--isa=rv64gcv --varch=vlen:128,elen:64}) and on Kites; compare GPRs, FPRs, vector registers, vector CSRs and a memory window. A covers the example and curated programs; B6 adds random programs at scale. & Spike~\cite{spike} \\
+L7 & System behaviour & Undo/redo property test: run $N$ steps, undo $N$, compare with the initial state bit-exactly; redo $N$ and compare with the final state. Also reset, breakpoints inside vector loops, the dump JSON schema, profiler counts, and the pipeline guard on all four RV5S models. & Recorded state \\
+L8 & Regression and platforms & Full existing suite on every merge; builds on macOS (Clang) and Linux (GCC); Windows via the release workflow. & Existing tests \\
+L9 & Coverage & gcovr through the existing \texttt{coverage} target, with thresholds from NF-04. & gcovr \\
+L10 & GUI (manual) & Checklist: vector section updates on step, run, undo, redo and reset; highlighting; syntax colouring and autocompletion; error markers on the right line. & Checklist in the validation report \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\subsection{Configuration test matrix}
+
+\begin{table}[H]
+\centering\small
+\caption{Dimensions of the semantic test matrix. Every family is swept over all 22 legal SEW/LMUL
+pairs with representative values of the other dimensions; the remaining dimensions are covered
+pairwise.}\label{tab:matrix}
+\begin{tabularx}{\textwidth}{@{}L{3.2cm}Y@{}}
+\toprule
+Dimension & Values \\
+\midrule
+SEW $\times$ LMUL & All legal pairs: 7 + 6 + 5 + 4 = 22 for ELEN = 64 (Table~\ref{tab:vlmax}); illegal pairs are covered by the \texttt{vill} tests \\
+\texttt{vl} & 0, 1, $\lfloor\mathrm{VLMAX}/2\rfloor+1$, VLMAX$-1$, VLMAX; AVL $>$ VLMAX and AVL $\ge 2\cdot$VLMAX \\
+Mask & Unmasked; masked with all ones, all zeros, alternating and random patterns \\
+Policy & \texttt{tu,mu}; \texttt{ta,ma}; mixed; with the all-ones agnostic fill when B4 exists \\
+\texttt{vstart} & 0; 1; \texttt{vl}$-1$; \texttt{vstart} $\ge$ \texttt{vl} (no body elements) \\
+Register overlap & \texttt{vd} = \texttt{vs1}, \texttt{vd} = \texttt{vs2}, \texttt{vs1} = \texttt{vs2} where the spec allows it; forbidden overlaps in L4 \\
+Memory & EEW 8--64 with every legal EMUL; strides 0, $\pm$EEW, large and non-multiple; index patterns identity, reversed, duplicate and random; misaligned base addresses \\
+FP & \texttt{frm} = RNE, RTZ, RDN, RUP, RMM, and dynamic; flag accrual over sequences \\
+Fixed point & \texttt{vxrm} = rnu, rne, rdn, rod; saturating and non-saturating inputs \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Reference oracles and golden sources}\label{sec:oracles}
+
+\begin{description}[style=nextline,leftmargin=0.6cm,font=\sffamily\bfseries\color{kblue}]
+\item[Spike (riscv-isa-sim)~\cite{spike}] The de-facto RISC-V reference simulator, with complete
+  RVV~1.0 support and configurable VLEN/ELEN. It is the main oracle for L3 spot checks and for L5/L6.
+\item[LLVM MC~\cite{llvm} and GNU binutils] Golden encodings and disassembly text for L2. Generated
+  golden files are committed, so tests do not need LLVM at run time.
+\item[riscv-opcodes~\cite{opcodes}] Machine-readable match/mask values for every vector instruction.
+  They are used to cross-check the ISA table automatically.
+\item[Spec Appendix B~\cite{specex}] Official vector code examples (memcpy, conditional execution,
+  SAXPY, SGEMM, division and square-root approximations, \texttt{strlen}, \texttt{strcmp},
+  \texttt{strcpy}, \texttt{strncpy}) that become L5 programs.
+\item[riscv-vector-tests~\cite{rvvtests}] Spike-generated per-instruction tests for VLEN 64 to 4096. Kites
+  cannot load ELF files, so test vectors are extracted rather than run directly. These tests do not
+  cover tail/mask-agnostic behaviour, fault-only-first, \texttt{vstart} or overlap, which is why L3/L4
+  cover those explicitly.
+\item[RVVTS~\cite{rvvts}] Coverage-driven RVV test sets reported to reach over 94\% functional
+  coverage. Used as a benchmark for test-coverage goals and, optionally, as an extra test source.
+\item[Independent reference model] A small, loop-based C++ model in the test tree, written from the
+  spec text without looking at the implementation.
+\end{description}
+
+\begin{notebox}[title=Known legitimate differences from Spike]
+The spec allows implementation-defined choices, and the differential tests must not flag them as
+bugs: (1) values of agnostic elements (Kites leaves them undisturbed, D3); (2) the summation order of
+\insn{vfredusum}/\insn{vfwredusum}, which can change the last bits (compared using exactly
+representable inputs, or with an ordered-sum oracle); (3) \texttt{vl} for
+VLMAX $<$ AVL $<$ 2$\cdot$VLMAX (Kites uses D2, the same as Spike's default). Every difference
+found is either fixed or recorded with its justification in the validation report.
+\end{notebox}
+
+\subsection{Example programs}\label{sec:examples}
+
+The programs in \file{examples/vector/} are run as integration tests (L5, L6):
+
+\begin{enumerate}[label=E\arabic*,leftmargin=1cm]
+\item \texttt{vvadd\_i32.s}: strip-mined vector add;
+\item \texttt{memcpy.s}: byte copy with \insn{vle8.v}/\insn{vse8.v} (spec Appendix B);
+\item \texttt{dot\_product.s}: \insn{vmul} with \insn{vredsum};
+\item \texttt{masked\_abs.s}: conditional update with \insn{vmslt} and a masked \insn{vrsub};
+\item \texttt{gather\_scatter.s}: table lookup and histogram with indexed accesses;
+\item \texttt{prefix\_sum.s}: log-step scan with \insn{vslideup};
+\item \texttt{matmul\_i32.s}: integer matrix multiply, checked against the existing scalar program (\file{cache_matrix_mul_3x3.s});
+\item \texttt{saxpy\_f32.s}: SAXPY with \insn{vfmacc.vf} (A2, spec Appendix B);
+\item \texttt{strlen.s}: \insn{vle8ff.v} with \insn{vmseq} and \insn{vfirst.m} (A2, spec Appendix B);
+\item \texttt{rgb\_to\_grey.s}: segment loads \insn{vlseg3e8.v} with widening multiply and narrowing (A2);
+\item \texttt{fir\_q15.s}: fixed-point FIR filter with \insn{vsmul} and \texttt{vxrm} (A2).
+\end{enumerate}
+
+\subsection{Quality gates}\label{sec:gates}
+
+\begin{table}[H]
+\centering\small
+\caption{Quality gates for completion of A1 and A2.}\label{tab:gates}
+\begin{tabularx}{\textwidth}{@{}L{1.0cm}Y@{}}
+\toprule
+QG1 & 100\% of in-scope mnemonics have encoding and semantic tests (enforced by the meta-test). \\
+QG2 & Zero failing tests, and zero known deviations from the spec without a documented reason. \\
+QG3 & At least 90\% line coverage and 75\% branch coverage on \file{src/processor/vector/} and \file{v_formats.cpp}. \\
+QG4 & All example programs match Spike bit-exactly (subject to the known differences above). \\
+QG5 & The existing suite passes on macOS and Linux, and scalar run time is within $\pm$5\% of the baseline. \\
+QG6 & Undo/redo property tests pass for every example program. \\
+QG7 & The GUI checklist is fully ticked, with screenshots in the validation report. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Traceability and defect tracking}\label{sec:trace}
+Each test name starts with the ID of the requirement it verifies. For example, the test
+\texttt{VM02\_negative\_stride} in suite \texttt{VecMem} checks requirement VM-02. The validation report has a
+requirement-to-test-to-result matrix generated from the CTest output. Defects are GitHub issues on
+the fork, labelled \texttt{vector}, each with a minimal reproducing \texttt{.s} file that becomes a
+regression test when the defect is fixed.
+
+% =====================================================================  10
+\section{Documentation plan}\label{sec:docs}
+
+\small
+\begin{longtable}{@{}L{4.6cm}L{2.0cm}L{2.6cm}L{5.7cm}@{}}
+\caption{Documentation deliverables.}\label{tab:docs}\\
+\toprule
+Document & Format & Audience & Content \\
+\midrule
+\endfirsthead
+\caption[]{Documentation deliverables (continued).}\\
+\toprule
+Document & Format & Audience & Content \\
+\midrule
+\endhead
+Scope document (this document) & LaTeX $\rightarrow$ PDF & Reviewers & Scope, requirements, approach, validation and documentation plans \\
+Design document & LaTeX $\rightarrow$ PDF & Reviewers, developers & Architecture, data structures, ISA table, algorithms, legality rules, integration details \\
+Validation report & LaTeX $\rightarrow$ PDF & Reviewers & Results per test level, coverage, Spike comparison, traceability matrix, known limitations \\
+\file{docs/VECTOR.md} & Markdown & Users & Supported instructions, syntax, configuration, examples, limitations \\
+\file{README.md}, \file{docs/CLI.md}, \file{docs/TESTING.md} & Markdown & Users, developers & Feature list (including the F15 fix), vector dump format, running the vector tests \\
+\file{docs/vector_extension/README.md} & Markdown & Developers & Index of these documents; how to build the PDFs \\
+Doxygen comments & In code & Developers & All public vector interfaces \\
+Example headers & Comments & Users & Purpose, inputs and expected results of each \texttt{.s} file \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+The LaTeX sources live in \file{docs/vector_extension/}, share the style file \file{kitesdoc.sty},
+and build with \texttt{tectonic} (or \texttt{make}). The PDFs are committed next to their sources.
+
+% =====================================================================  11
+\section{Risks and mitigations}\label{sec:risks}
+
+\small
+\begin{longtable}{@{}L{0.7cm}L{4.6cm}L{0.5cm}L{0.5cm}L{8.1cm}@{}}
+\caption{Risks and mitigations.}\label{tab:risks}\\
+\toprule
+ID & Risk & L & I & Mitigation \\
+\midrule
+\endfirsthead
+\caption[]{Risks and mitigations (continued).}\\
+\toprule
+ID & Risk & L & I & Mitigation \\
+\midrule
+\endhead
+R1 & With 627 mnemonics, the encoder, decoder and executor drift apart. & M & H & Single ISA table (D10); \texttt{riscv-opcodes} cross-check; table-completeness meta-test. \\
+R2 & Subtle spec rules (overlap, EMUL, policies, \texttt{vstart}) are implemented wrongly. & H & H & One legality module with a test per rule; shared element loop; Spike differential tests; review against the spec text. \\
+R3 & Sharing opcodes with scalar FP loads/stores breaks F/D. & M & H & Route on \texttt{width} before the F/D checks; run the existing FP suites on every merge (SI-03). \\
+R4 & FP corner cases (NaNs, flags, rounding, \texttt{rec7} tables) differ from Spike. & M & M & Own spec-conformant element routines (D9); dedicated FP edge-case suite. \\
+R5 & Assembler ambiguity (\texttt{v0.t} lexing, labels named like vtype fields). & M & M & Context-sensitive lexing; tests AS-04. \\
+R6 & Portability (\texttt{\_\_int128}; Windows MinGW release builds). & L & M & Portable 128-bit multiply helper; build on macOS and Linux; Windows through the release workflow. \\
+R7 & GUI slows down with many register updates or a large VLEN. & L & M & One batched update per step; refresh only changed registers. \\
+R8 & Spike or LLVM is hard to install on the development machine. & M & M & Homebrew packages; committed golden files; the independent C++ oracle needs no external tools. \\
+R9 & Pipeline integration (B1) is more invasive than expected. & M & M & Kept out of the compulsory scope; the D12 guard keeps the pipelines safe in the meantime. \\
+R10 & Existing scalar issues (F8, F15) interfere with vector work. & M & L & Fix them in small, separate, tested commits, and report them upstream. \\
+R11 & Upstream Kites changes conflict with the branch. & L & M & Keep the hooks small (D13); rebase regularly. \\
+\bottomrule
+\end{longtable}
+\normalsize
+\noindent L = likelihood, I = impact; H = high, M = medium, L = low.
+
+% =====================================================================  12
+\section{Open questions}\label{sec:open}
+
+Implementation proceeds with the default shown for each question until it is answered.
+
+\begin{enumerate}[label=Q\arabic*,leftmargin=1cm]
+\item \textbf{Pipelined vector execution compulsory?} Default: no, stretch goal B1. If compulsory,
+      B1 moves to A and A2.4--A2.5 move to Tier B.
+\item \textbf{Default VLEN.} Default: 128, the minimum for \textbf{V} (D1).
+\item \textbf{Agnostic policy.} Default: undisturbed, with all-ones as an option (D3).
+\item \textbf{FP vector instructions compulsory?} Default: yes; \textbf{V} requires them and Kites
+      already implements F and D.
+\item \textbf{Upstream contribution.} Default: the work targets the fork; a PR to
+      \file{hghit-harshit/Kites} is optional.
+\end{enumerate}
+
+% =====================================================================  REFERENCES
+\begin{thebibliography}{99}\small\markboth{References}{References}
+\bibitem{spec} RISC-V International. \emph{The RISC-V Instruction Set Manual, Volume I: Unprivileged
+  Architecture}, release 20260120, Chapter 30: ``V'' Standard Extension for Vector Operations, version 1.0.
+  \url{https://docs.riscv.org/reference/isa/v20260120/unpriv/v-st-ext.html}
+\bibitem{specex} RISC-V International. \emph{Unprivileged ISA manual}, Appendix B: Vector Assembly Code Examples.
+  \url{https://docs.riscv.org/reference/isa/v20260120/unpriv/vector-examples.html}
+\bibitem{vspec} RISC-V International. \emph{riscv-v-spec}, the original repository of the RVV 1.0 specification.
+  \url{https://github.com/riscv/riscv-v-spec}
+\bibitem{opcodes} RISC-V International. \emph{riscv-opcodes} (vector encodings in \texttt{extensions/rv\_v}).
+  \url{https://github.com/riscv/riscv-opcodes}
+\bibitem{asm} RISC-V International. \emph{RISC-V Assembly Programmer's Manual}.
+  \url{https://github.com/riscv-non-isa/riscv-asm-manual}
+\bibitem{spike} RISC-V Software. \emph{Spike RISC-V ISA Simulator}.
+  \url{https://github.com/riscv-software-src/riscv-isa-sim}
+\bibitem{llvm} LLVM Project. \emph{User Guide for RISC-V Target} and \texttt{llvm-mc}.
+  \url{https://llvm.org/docs/RISCVUsage.html}
+\bibitem{rvvtests} CHIPS Alliance. \emph{riscv-vector-tests}: a generator for RISC-V vector unit tests.
+  \url{https://github.com/chipsalliance/riscv-vector-tests}
+\bibitem{rvvts} Institute for Complex Systems, JKU Linz. \emph{RVVTS: RISC-V Vector Test Suite}.
+  \url{https://github.com/ics-jku/RVVTS}
+\bibitem{hp} J.~L.~Hennessy and D.~A.~Patterson. \emph{Computer Architecture: A Quantitative Approach}, 6th ed.,
+  Chapter 4: Data-Level Parallelism in Vector, SIMD, and GPU Architectures. Morgan Kaufmann, 2017.
+\bibitem{ara} M.~Perotti et al. ``A `New Ara' for Vector Computing: An Open Source Highly Efficient
+  RISC-V V 1.0 Vector Processor Design.'' \emph{ASAP 2022}. arXiv:2210.08882.
+\bibitem{kites} Kites RISC-V simulator. \url{https://github.com/hghit-harshit/Kites}
+\end{thebibliography}
+
+% =====================================================================  APPENDICES
+\clearpage
+\appendix
+\section{Instruction inventory}\label{app:inventory}
+
+Mnemonics are grouped by family. Braces expand to alternatives, for example
+\insn{vadd.\{vv,vx,vi\}} means three mnemonics. EEW $\in\{8,16,32,64\}$ and NF $\in\{2,\dots,8\}$.
+The counts were produced by a script that enumerates the specification's instruction listings.
+
+\small
+\begin{longtable}{@{}L{3.5cm}L{9.3cm}r L{0.8cm}@{}}
+\caption{RVV 1.0 instruction inventory by family, with tier.}\label{tab:inventory}\\
+\toprule
+Family & Mnemonics & \# & Tier \\
+\midrule
+\endfirsthead
+\caption[]{RVV 1.0 instruction inventory by family, with tier (continued).}\\
+\toprule
+Family & Mnemonics & \# & Tier \\
+\midrule
+\endhead
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Configuration and memory}}}\\
+Configuration & \insn{vsetvli}, \insn{vsetivli}, \insn{vsetvl} & 3 & \must \\
+Unit-stride & \insn{vle<EEW>.v}, \insn{vse<EEW>.v} & 8 & \must \\
+Mask load/store & \insn{vlm.v}, \insn{vsm.v} & 2 & \must \\
+Strided & \insn{vlse<EEW>.v}, \insn{vsse<EEW>.v} & 8 & \must \\
+Indexed & \insn{vl\{u,o\}xei<EEW>.v}, \insn{vs\{u,o\}xei<EEW>.v} & 16 & \must \\
+Whole register & \insn{vl\{1,2,4,8\}re<EEW>.v}, \insn{vs\{1,2,4,8\}r.v} & 20 & \must \\
+Fault-only-first & \insn{vle<EEW>ff.v} & 4 & \should \\
+Segment & \insn{vlseg<NF>e<EEW>\{,ff\}.v}, \insn{vsseg}, \insn{vlsseg}, \insn{vssseg}, \insn{vl\{u,o\}xseg<NF>ei<EEW>.v}, \insn{vs\{u,o\}xseg<NF>ei<EEW>.v} & 252 & \should \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Integer arithmetic}}}\\
+Add / subtract & \insn{vadd.\{vv,vx,vi\}}, \insn{vsub.\{vv,vx\}}, \insn{vrsub.\{vx,vi\}} & 7 & \must \\
+Widening add/sub & \insn{vw\{add,sub\}\{,u\}.\{vv,vx,wv,wx\}} & 16 & \must \\
+Extension & \insn{v\{z,s\}ext.vf\{2,4,8\}} & 6 & \must \\
+Carry / borrow & \insn{vadc.\{vvm,vxm,vim\}}, \insn{vmadc.\{vvm,vxm,vim,vv,vx,vi\}}, \insn{vsbc.\{vvm,vxm\}}, \insn{vmsbc.\{vvm,vxm,vv,vx\}} & 15 & \must \\
+Bitwise & \insn{v\{and,or,xor\}.\{vv,vx,vi\}} & 9 & \must \\
+Shifts & \insn{v\{sll,srl,sra\}.\{vv,vx,vi\}} & 9 & \must \\
+Narrowing shifts & \insn{vn\{srl,sra\}.\{wv,wx,wi\}} & 6 & \must \\
+Compare & \insn{vms\{eq,ne,leu,le\}.\{vv,vx,vi\}}, \insn{vms\{ltu,lt\}.\{vv,vx\}}, \insn{vms\{gtu,gt\}.\{vx,vi\}} & 20 & \must \\
+Min / max & \insn{v\{min,max\}\{,u\}.\{vv,vx\}} & 8 & \must \\
+Multiply & \insn{vmul}, \insn{vmulh}, \insn{vmulhu}, \insn{vmulhsu} \insn{.\{vv,vx\}} & 8 & \must \\
+Divide / remainder & \insn{v\{div,rem\}\{,u\}.\{vv,vx\}} & 8 & \must \\
+Widening multiply & \insn{vwmul\{,u,su\}.\{vv,vx\}} & 6 & \must \\
+Multiply-add & \insn{v\{macc,nmsac,madd,nmsub\}.\{vv,vx\}} & 8 & \must \\
+Widening multiply-add & \insn{vwmacc\{,u,su\}.\{vv,vx\}}, \insn{vwmaccus.vx} & 7 & \must \\
+Merge / move & \insn{vmerge.\{vvm,vxm,vim\}}, \insn{vmv.v.\{v,x,i\}} & 6 & \must \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Fixed-point}}}\\
+Saturating add/sub & \insn{vsadd\{,u\}.\{vv,vx,vi\}}, \insn{vssub\{,u\}.\{vv,vx\}} & 10 & \should \\
+Averaging add/sub & \insn{va\{add,sub\}\{,u\}.\{vv,vx\}} & 8 & \should \\
+Fractional multiply & \insn{vsmul.\{vv,vx\}} & 2 & \should \\
+Scaling shifts & \insn{vss\{rl,ra\}.\{vv,vx,vi\}} & 6 & \should \\
+Narrowing clips & \insn{vnclip\{,u\}.\{wv,wx,wi\}} & 6 & \should \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Floating-point}}}\\
+Add / subtract & \insn{vf\{add,sub\}.\{vv,vf\}}, \insn{vfrsub.vf} & 5 & \should \\
+Widening add/sub & \insn{vfw\{add,sub\}.\{vv,vf,wv,wf\}} & 8 & \should \\
+Multiply / divide & \insn{vf\{mul,div\}.\{vv,vf\}}, \insn{vfrdiv.vf} & 5 & \should \\
+Widening multiply & \insn{vfwmul.\{vv,vf\}} & 2 & \should \\
+Fused multiply-add & \insn{vf\{,n\}m\{acc,sac,add,sub\}.\{vv,vf\}} & 16 & \should \\
+Widening FMA & \insn{vfw\{,n\}m\{acc,sac\}.\{vv,vf\}} & 8 & \should \\
+Unary & \insn{vfsqrt.v}, \insn{vfrsqrt7.v}, \insn{vfrec7.v}, \insn{vfclass.v} & 4 & \should \\
+Min / max & \insn{vf\{min,max\}.\{vv,vf\}} & 4 & \should \\
+Sign injection & \insn{vfsgnj\{,n,x\}.\{vv,vf\}} & 6 & \should \\
+Compare & \insn{vmf\{eq,ne,lt,le\}.\{vv,vf\}}, \insn{vmf\{gt,ge\}.vf} & 10 & \should \\
+Merge / move & \insn{vfmerge.vfm}, \insn{vfmv.v.f} & 2 & \should \\
+Conversions & \insn{vfcvt.*} (6), \insn{vfwcvt.*} (7), \insn{vfncvt.*} (8), including \texttt{rtz} and \texttt{rod} & 21 & \should \\
+\multicolumn{4}{@{}l}{\textsf{\textbf{\color{kblue}Reductions, masks and permutations}}}\\
+Integer reductions & \insn{vred\{sum,and,or,xor,min,minu,max,maxu\}.vs}, \insn{vwredsum\{,u\}.vs} & 10 & \must \\
+FP reductions & \insn{vfred\{osum,usum,min,max\}.vs}, \insn{vfwred\{osum,usum\}.vs} & 6 & \should \\
+Mask instructions & \insn{vm\{and,nand,andn,xor,or,nor,orn,xnor\}.mm}, \insn{vcpop.m}, \insn{vfirst.m}, \insn{vms\{bf,if,of\}.m}, \insn{viota.m}, \insn{vid.v} & 15 & \must \\
+Integer permutations & \insn{vmv.x.s}, \insn{vmv.s.x}, \insn{vslide\{up,down\}.\{vx,vi\}}, \insn{vslide1\{up,down\}.vx}, \insn{vrgather.\{vv,vx,vi\}}, \insn{vrgatherei16.vv}, \insn{vcompress.vm}, \insn{vmv\{1,2,4,8\}r.v} & 17 & \must \\
+FP permutations & \insn{vfmv.f.s}, \insn{vfmv.s.f}, \insn{vfslide1\{up,down\}.vf} & 4 & \should \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Total}: A1 238 + A2 389} & \textbf{627} & \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\section{Assembly syntax forms}\label{app:syntax}
+
+Square brackets mark the optional mask operand. The generic parser handles each row as one operand
+pattern.
+
+\small
+\begin{longtable}{@{}L{4.7cm}L{5.6cm}L{4.8cm}@{}}
+\caption{Assembly operand patterns.}\label{tab:syntax}\\
+\toprule
+Pattern & Example & Used by \\
+\midrule
+\endfirsthead
+\caption[]{Assembly operand patterns (continued).}\\
+\toprule
+Pattern & Example & Used by \\
+\midrule
+\endhead
+\texttt{rd, rs1, vtypei} & \texttt{vsetvli t0, a0, e32, m2, ta, ma} & \insn{vsetvli} \\
+\texttt{rd, uimm, vtypei} & \texttt{vsetivli t0, 8, e8, mf2, tu, mu} & \insn{vsetivli} \\
+\texttt{rd, rs1, rs2} & \texttt{vsetvl t0, a0, a1} & \insn{vsetvl} \\
+\texttt{vd, (rs1) [, v0.t]} & \texttt{vle32.v v4, (a1), v0.t} & unit-stride, ff, segment, mask, whole register \\
+\texttt{vd, (rs1), rs2 [, v0.t]} & \texttt{vlse64.v v8, (a1), t1} & strided \\
+\texttt{vd, (rs1), vs2 [, v0.t]} & \texttt{vluxei32.v v8, (a1), v4} & indexed \\
+\texttt{vd, vs2, vs1 [, v0.t]} & \texttt{vadd.vv v1, v2, v3, v0.t} & \texttt{.vv}, \texttt{.wv}, \texttt{.vs}, \texttt{.mm} \\
+\texttt{vd, vs2, rs1 [, v0.t]} & \texttt{vsub.vx v1, v2, a0} & \texttt{.vx}, \texttt{.wx}, slides \\
+\texttt{vd, vs2, imm [, v0.t]} & \texttt{vsll.vi v1, v2, 3} & \texttt{.vi}, \texttt{.wi} \\
+\texttt{vd, vs2, fs1 [, v0.t]} & \texttt{vfmul.vf v1, v2, fa0} & \texttt{.vf}, \texttt{.wf} \\
+\texttt{vd, vs1, vs2 [, v0.t]} & \texttt{vmacc.vv v1, v2, v3} & integer and FP multiply-add (note the operand order) \\
+\texttt{vd, rs1 / fs1, vs2 [, v0.t]} & \texttt{vfmacc.vf v1, fa0, v2} & multiply-add, scalar forms \\
+\texttt{vd, vs2, vs1 / rs1 / imm, v0} & \texttt{vmerge.vvm v1, v2, v3, v0} & carry/borrow, merge (\texttt{v0} is an operand, not a mask) \\
+\texttt{vd, vs1 / rs1 / imm / fs1} & \texttt{vmv.v.x v1, a0} & \insn{vmv.v.*}, \insn{vfmv.v.f} \\
+\texttt{rd, vs2} / \texttt{fd, vs2} & \texttt{vmv.x.s a0, v1} & \insn{vmv.x.s}, \insn{vfmv.f.s} \\
+\texttt{vd, rs1} / \texttt{vd, fs1} & \texttt{vmv.s.x v1, a0} & \insn{vmv.s.x}, \insn{vfmv.s.f} \\
+\texttt{vd, vs2 [, v0.t]} & \texttt{vzext.vf2 v2, v1} & unary, conversions, \insn{vmsbf.m}, \insn{viota.m} \\
+\texttt{rd, vs2 [, v0.t]} & \texttt{vcpop.m a0, v0} & \insn{vcpop.m}, \insn{vfirst.m} \\
+\texttt{vd [, v0.t]} & \texttt{vid.v v1} & \insn{vid.v} \\
+\texttt{vd, vs2, vs1} & \texttt{vcompress.vm v1, v2, v0} & \insn{vcompress.vm} \\
+\texttt{vd, vs2} & \texttt{vmv2r.v v2, v4} & whole-register move \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\section{Impact on existing Kites files}\label{app:impact}
+
+\small
+\begin{longtable}{@{}L{5.8cm}L{7.6cm}L{1.6cm}@{}}
+\caption{Existing files affected, by tier.}\label{tab:impact}\\
+\toprule
+File(s) & Change & Tier \\
+\midrule
+\endfirsthead
+\caption[]{Existing files affected, by tier (continued).}\\
+\toprule
+File(s) & Change & Tier \\
+\midrule
+\endhead
+\file{src/processor/registers.h}, \file{registers.cpp} & Vector register storage; vector CSR names and addresses; \texttt{vcsr} view; \texttt{v0}--\texttt{v31} names; change signals & A1 \\
+\file{src/common/register_names.h} & Vector register names & A1 \\
+\file{src/common/instructions.h}, \file{instructions.cpp} & \texttt{isVectorInstruction()}; hooks into validation, type lookup, expected-syntax text and \texttt{disassemble()} & A1 \\
+\file{src/common/instruction_types.h} & \texttt{V\_TYPE} category & A1 \\
+\file{src/assembler/tokens.h}, \file{lexer.cpp} & \texttt{VEC\_REGISTER}, \texttt{VEC\_MASK}, \texttt{VTYPE\_FIELD}; context-sensitive lexing & A1 \\
+\file{src/assembler/parser.h}, \file{parser.cpp} & Dispatch to the generic vector parser & A1 \\
+\file{src/assembler/code_generator.h}, \file{code_generator.cpp} & New \texttt{ICUnit} fields; vector encoder & A1 \\
+\file{src/assembler/parse_formats/pseudo_formats.cpp} & \insn{csrr}-style pseudo-instructions (A1); vector pseudo-instructions (A2) & A1, A2 \\
+\file{src/processor/processor_base.h} & \texttt{StepDelta} vector register changes & A1 \\
+\file{src/processor/rvss/rvss_processor.cpp}, \file{rvss_control_unit.cpp} & Routing, commit, undo/redo, reset & A1 \\
+\file{src/processor/rv5s/*} & Decode guard (A1); full integration including \file{rv5s_hdu.cpp} and \file{pipeline_registers.h} (B1) & A1, B1 \\
+\file{src/utils/utils.cpp} & \texttt{vector\_registers} section in the register dump & A1 \\
+\file{src/ui/register_table/*} & \emph{Vector} section (A1); element-wise viewer (B3) & A1, B3 \\
+\file{resources/instructions/instructions.json} & \texttt{VInstruction} list (generated) & A1 \\
+\file{src/language_service/completion_provider.cpp}, \file{src/ui/common/syntax_highlighter.cpp} & Check and extend for vector registers and mnemonics & A1 \\
+\file{src/profiler/*} & \texttt{V-Type} (A1); vector metrics (B5) & A1, B5 \\
+\file{src/config/config.h}, \file{src/ui/dialogs/settings_dialog.*} & VLEN and agnostic-policy settings & B4 \\
+\file{cli/main.cpp}, \file{cli/repl.cpp} & Documentation (A1); flags and commands (B4, B9) & A1, B \\
+\file{src/ui/processor_tab/*} & Vector unit diagram & B7 \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\section{Glossary}\label{app:glossary}
+
+\small
+\begin{longtable}{@{}L{3.6cm}L{11.6cm}@{}}
+\toprule
+Term & Meaning \\
+\midrule
+\endhead
+\textsf{\textbf{AVL}} & Application vector length: the number of elements software still wants to process. \\
+\textsf{\textbf{VLEN}} & Width of each vector register in bits (128 by default in Kites). \\
+\textsf{\textbf{ELEN}} & Largest supported element width in bits (64). \\
+\textsf{\textbf{SEW / EEW}} & Selected element width from \texttt{vtype}; effective element width of a particular operand. \\
+\textsf{\textbf{LMUL / EMUL}} & Register-group multiplier from \texttt{vtype}; effective multiplier of a particular operand. \\
+\textsf{\textbf{VLMAX}} & Maximum number of elements an instruction can process: LMUL$\times$VLEN/SEW. \\
+\textsf{\textbf{vl}} & Number of elements the current instruction processes ($\le$ VLMAX). \\
+\textsf{\textbf{Prestart / body / tail}} & Elements below \texttt{vstart}; from \texttt{vstart} to \texttt{vl}$-1$; from \texttt{vl} to VLMAX$-1$. \\
+\textsf{\textbf{Active / inactive}} & Body elements whose mask bit is 1 / 0. \\
+\textsf{\textbf{Undisturbed / agnostic}} & Policy for inactive and tail elements: keep the old value / old value or all ones. \\
+\textsf{\textbf{Strip-mining}} & Processing a long array in chunks of \texttt{vl} elements per loop iteration. \\
+\textsf{\textbf{Segment access}} & A load or store that moves records of NFIELDS fields into NFIELDS separate register groups. \\
+\textsf{\textbf{Fault-only-first}} & A load that traps only on element 0 and otherwise shortens \texttt{vl}. \\
+\textsf{\textbf{Chime, lane, chaining}} & Timing concepts (B2): the time to issue one vector instruction; a parallel datapath slice; starting a dependent instruction before its producer finishes. \\
+\textsf{\textbf{Oracle}} & An independent source of expected results used by a test. \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\end{document}

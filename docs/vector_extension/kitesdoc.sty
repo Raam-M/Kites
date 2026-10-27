@@ -1,0 +1,115 @@
+% kitesdoc.sty - shared style for the Kites vector-extension documents
+% (scope document, design document, validation report).
+% Build with Tectonic (XeTeX): `tectonic <file>.tex`
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{kitesdoc}[2026/10/27 Kites vector extension document style]
+
+% ---------------------------------------------------------------- page & fonts
+\RequirePackage[a4paper,margin=2.3cm,headheight=14pt]{geometry}
+\RequirePackage{fontspec}
+\setmainfont{texgyrepagella}[Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,
+  ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
+\setsansfont{texgyreheros}[Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,
+  ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
+\setmonofont{lmmono10-regular}[Extension=.otf,Scale=0.95,BoldFont=lmmonolt10-bold,ItalicFont=lmmono10-italic]
+\RequirePackage{microtype}
+\linespread{1.06}
+\setlength{\parskip}{0.45em}
+\setlength{\parindent}{0pt}
+\setlength{\emergencystretch}{3em}
+
+% ---------------------------------------------------------------- packages
+\RequirePackage{amsmath}
+\RequirePackage{xcolor}
+\RequirePackage{booktabs,longtable,tabularx,array,multirow,makecell}
+\RequirePackage{enumitem}
+\RequirePackage{fancyhdr}
+\RequirePackage[nobottomtitles*]{titlesec}
+\renewcommand{\bottomtitlespace}{0.14\textheight}
+\RequirePackage{listings}
+\RequirePackage{bytefield}
+\RequirePackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,calc,shapes.geometric,backgrounds,decorations.pathreplacing}
+\RequirePackage[most]{tcolorbox}
+\RequirePackage{caption}
+\RequirePackage{float}
+\RequirePackage{hyperref}
+\def\UrlBreaks{\do\/}
+
+% ---------------------------------------------------------------- colours
+\definecolor{kblue}{HTML}{1F4E79}
+\definecolor{kteal}{HTML}{0F766E}
+\definecolor{kgrey}{HTML}{5B6573}
+\definecolor{klight}{HTML}{EEF3F8}
+\definecolor{kmust}{HTML}{B42318}
+\definecolor{kshould}{HTML}{B54708}
+\definecolor{kstretch}{HTML}{027A48}
+\definecolor{knew}{HTML}{FDECC8}
+
+\hypersetup{colorlinks=true,linkcolor=kblue,urlcolor=kteal,citecolor=kteal,
+  pdfauthor={Raam M},pdfcreator={Tectonic}}
+
+% ---------------------------------------------------------------- headings
+\titleformat{\section}{\sffamily\Large\bfseries\color{kblue}}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\sffamily\large\bfseries\color{kblue}}{\thesubsection}{0.7em}{}
+\titleformat{\subsubsection}{\sffamily\normalsize\bfseries\color{kgrey}}{\thesubsubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.6em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.2em}{0.4em}
+
+\captionsetup{font=small,labelfont={bf,sf,color=kblue}}
+
+% ---------------------------------------------------------------- header/footer
+\newcommand{\kdocshorttitle}{Kites Vector Extension}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\sffamily\color{kgrey}\kdocshorttitle}
+\fancyhead[R]{\small\sffamily\color{kgrey}\nouppercase{\leftmark}}
+\fancyfoot[C]{\small\sffamily\color{kgrey}\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\sectionmark}[1]{\markboth{\thesection\quad #1}{}}
+
+% ---------------------------------------------------------------- lists
+\setlist{itemsep=0.15em,topsep=0.3em,parsep=0pt}
+
+% ---------------------------------------------------------------- code
+\lstdefinelanguage{rvasm}{
+  morekeywords={vsetvli,vsetivli,vsetvl,vle8.v,vle16.v,vle32.v,vle64.v,vse8.v,vse16.v,
+    vse32.v,vse64.v,vle8ff.v,vadd.vv,vadd.vx,vadd.vi,vmul.vx,vredsum.vs,vmseq.vi,vfirst.m,
+    vfmacc.vf,vmv.s.x,vmv.x.s,vlse32.v,vluxei32.v,vmslt.vx,vrsub.vx,vmerge.vvm,csrr,
+    add,addi,sub,slli,bnez,beqz,ret,li,ecall,la,mv,ld,sd,lw,sw,flw,j},
+  sensitive=true,
+  alsoletter={.},
+  morecomment=[l]{\#},
+  morestring=[b]"
+}
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{kblue}\bfseries,
+  commentstyle=\color{kgrey}\itshape,
+  stringstyle=\color{kteal},
+  frame=single,framerule=0.3pt,rulecolor=\color{kgrey!50},
+  backgroundcolor=\color{klight},
+  xleftmargin=0.5em,xrightmargin=0.5em,aboveskip=0.6em,belowskip=0.6em,
+  columns=fullflexible,keepspaces=true,showstringspaces=false,breaklines=true
+}
+
+% ---------------------------------------------------------------- helpers
+\newcommand{\file}[1]{\path{#1}}
+\newcommand{\insn}[1]{\texttt{#1}}
+\newcommand{\must}{\textcolor{kmust}{\textsf{\textbf{A1}}}}
+\newcommand{\should}{\textcolor{kshould}{\textsf{\textbf{A2}}}}
+\newcommand{\tierBmark}{\textcolor{kstretch}{\textsf{\textbf{B}}}}
+\newcommand{\tierA}[1]{\textcolor{kmust}{\textsf{\textbf{#1}}}}
+\newcommand{\tierAA}[1]{\textcolor{kshould}{\textsf{\textbf{#1}}}}
+\newcommand{\tierB}[1]{\textcolor{kstretch}{\textsf{\textbf{#1}}}}
+
+\newtcolorbox{keybox}[1][]{enhanced,colback=klight,colframe=kblue,boxrule=0.6pt,
+  arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,fonttitle=\sffamily\bfseries,#1}
+\newtcolorbox{notebox}[1][]{enhanced,colback=knew!60,colframe=kshould,boxrule=0.5pt,
+  arc=2pt,left=8pt,right=8pt,top=5pt,bottom=5pt,fonttitle=\sffamily\bfseries,#1}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\renewcommand{\arraystretch}{1.18}
+
+\endinput
