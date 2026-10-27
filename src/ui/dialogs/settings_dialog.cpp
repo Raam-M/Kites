@@ -4,7 +4,10 @@
 #include "addpseudo_dialog.h"
 #include "ui/theme/font_manager.h"
 #include "ui/theme/theme_manager.h"
+#include "processor/vector/vector_config.h"
+#include "processor/vector/vector_profiler.h"
 #include "ui_settings_dialog.h"
+#include <QCheckBox>
 #include <QComboBox>
 #include <QFileDialog>
 #include <QFormLayout>
@@ -28,6 +31,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent), ui(new Ui::Se
     addPage("Appearance", createAppearancePage());
     addPage("Editor", createEditorPage());
     addPage("Custom Pseudo Instructions", createCustomPseudoInstPage());
+    addPage("Vector Extension", createVectorPage());
 }
 
 SettingsDialog::~SettingsDialog()
@@ -139,6 +143,123 @@ QWidget *SettingsDialog::createCustomPseudoInstPage()
     mainLayout->addWidget(table);
     mainLayout->addLayout(buttonLayout);
     page->setLayout(mainLayout);
+    return page;
+}
+
+QWidget *SettingsDialog::createVectorPage()
+{
+    QWidget *page = new QWidget(this);
+    auto *outer = new QVBoxLayout(page);
+    auto *layout = new QFormLayout();
+    outer->addLayout(layout);
+
+    const rvv::VectorConfig &cfg = rvv::config();
+    const rvv::TimingConfig &timing = rvv::timingConfig();
+
+    auto *vlenCombo = new QComboBox(page);
+    for (unsigned vlen = rvv::kMinVlen; vlen <= rvv::kMaxVlen; vlen *= 2)
+        vlenCombo->addItem(QString::number(vlen), vlen);
+    vlenCombo->setCurrentIndex(vlenCombo->findData(cfg.vlen));
+
+    auto *agnosticCombo = new QComboBox(page);
+    agnosticCombo->addItem("Leave undisturbed", false);
+    agnosticCombo->addItem("Fill with all ones", true);
+    agnosticCombo->setCurrentIndex(cfg.agnosticFillOnes ? 1 : 0);
+
+    auto *profileCombo = new QComboBox(page);
+    for (rvv::Profile p : {rvv::Profile::V, rvv::Profile::Zve64d, rvv::Profile::Zve64f,
+                           rvv::Profile::Zve64x, rvv::Profile::Zve32f, rvv::Profile::Zve32x})
+    {
+        const QString name = QString::fromStdString(rvv::profileName(p));
+        QString label = name == "v" ? "V (ELEN 64, FP 32/64)" : name;
+        if (p == rvv::Profile::Zve64d)
+            label += " (ELEN 64, FP 32/64)";
+        else if (p == rvv::Profile::Zve64f)
+            label += " (ELEN 64, FP 32)";
+        else if (p == rvv::Profile::Zve64x)
+            label += " (ELEN 64, no FP)";
+        else if (p == rvv::Profile::Zve32f)
+            label += " (ELEN 32, FP 32)";
+        else if (p == rvv::Profile::Zve32x)
+            label += " (ELEN 32, no FP)";
+        profileCombo->addItem(label, name);
+    }
+    profileCombo->setCurrentIndex(
+        profileCombo->findData(QString::fromStdString(rvv::profileName(cfg.profile))));
+
+    auto *zvfh = new QCheckBox("Zvfh: half-precision floating point", page);
+    auto *zvbb = new QCheckBox("Zvbb: basic bit manipulation", page);
+    auto *zvkb = new QCheckBox("Zvkb: bit manipulation subset (included in Zvbb)", page);
+    auto *zvbc = new QCheckBox("Zvbc: carry-less multiply", page);
+    zvfh->setChecked(cfg.zvfh);
+    zvbb->setChecked(cfg.zvbb);
+    zvkb->setChecked(cfg.zvkb && !cfg.zvbb);
+    zvbc->setChecked(cfg.zvbc);
+
+    auto *lanesCombo = new QComboBox(page);
+    for (unsigned lanes = 1; lanes <= 32; lanes *= 2)
+        lanesCombo->addItem(QString::number(lanes), lanes);
+    lanesCombo->setCurrentIndex(lanesCombo->findData(timing.lanes));
+    auto *chaining = new QCheckBox("Chain dependent instructions", page);
+    chaining->setChecked(timing.chaining);
+
+    auto *status = new QLabel(page);
+    status->setWordWrap(true);
+
+    auto apply = [=]()
+    {
+        QStringList list{profileCombo->currentData().toString()};
+        if (zvfh->isChecked())
+            list << "zvfh";
+        if (zvbb->isChecked())
+            list << "zvbb";
+        if (zvkb->isChecked())
+            list << "zvkb";
+        if (zvbc->isChecked())
+            list << "zvbc";
+        rvv::VectorConfig next = rvv::config();
+        const std::string error = rvv::applyExtensionList(next, list.join(",").toStdString());
+        if (!error.empty())
+        {
+            status->setText("Not applied: " + QString::fromStdString(error) + ".");
+            return;
+        }
+        next.vlen = vlenCombo->currentData().toUInt();
+        next.agnosticFillOnes = agnosticCombo->currentData().toBool();
+        const bool vlenChanged = next.vlen != rvv::config().vlen;
+        rvv::config() = next;
+        rvv::timingConfig().lanes = lanesCombo->currentData().toUInt();
+        rvv::timingConfig().chaining = chaining->isChecked();
+
+        AppSettings &settings = AppSettings::getInstance();
+        settings.setVectorVlen(static_cast<int>(next.vlen));
+        settings.setVectorAgnosticOnes(next.agnosticFillOnes);
+        settings.setVectorExtensions(list.join(","));
+        settings.setVectorLanes(static_cast<int>(rvv::timingConfig().lanes));
+        settings.setVectorChaining(rvv::timingConfig().chaining);
+        status->setText(vlenChanged ? "Saved. The new VLEN applies when the program is next "
+                                      "assembled or the processor is reset."
+                                    : "Saved.");
+    };
+
+    connect(vlenCombo, &QComboBox::currentIndexChanged, this, apply);
+    connect(agnosticCombo, &QComboBox::currentIndexChanged, this, apply);
+    connect(profileCombo, &QComboBox::currentIndexChanged, this, apply);
+    connect(lanesCombo, &QComboBox::currentIndexChanged, this, apply);
+    for (QCheckBox *box : {zvfh, zvbb, zvkb, zvbc, chaining})
+        connect(box, &QCheckBox::toggled, this, apply);
+
+    layout->addRow("VLEN (bits):", vlenCombo);
+    layout->addRow("Agnostic elements:", agnosticCombo);
+    layout->addRow("Profile:", profileCombo);
+    layout->addRow("Extensions:", zvfh);
+    layout->addRow("", zvbb);
+    layout->addRow("", zvkb);
+    layout->addRow("", zvbc);
+    layout->addRow("Timing model lanes:", lanesCombo);
+    layout->addRow("", chaining);
+    outer->addWidget(status);
+    outer->addStretch(1);
     return page;
 }
 

@@ -1,3 +1,4 @@
+#include "config/app_settings.h"
 #include "ui/mainwindow/mainwindow.h"
 #include "ui/theme/app_style.h"
 #ifdef LOG_PANEL
@@ -34,6 +35,9 @@ int main(int argc, char *argv[])
     #endif
 
     a.setStyle(new Kites::AppStyle(QStyleFactory::create("Fusion")));
+
+    // Vector settings must be in place before the processors (and their register files) exist.
+    Kites::AppSettings::getInstance().applyVectorSettings();
     
     Kites::MainWindow w;
     w.setWindowState(Qt::WindowMaximized);

@@ -131,9 +131,10 @@ void PrintVectorRegisters(std::ostream &os, RegisterFile &registers,
 void PrintVectorCsrs(std::ostream &os, RegisterFile &registers)
 {
     const uint64_t vtype = registers.ReadCsr(csr_address::kVtype);
+    const bool vill = rvv::VType{vtype}.vill();
     os << "  vl     = " << registers.ReadCsr(csr_address::kVl) << "\n"
-       << "  vtype  = 0x" << std::hex << vtype << std::dec << "  (" << rvv::vtypeToString(vtype)
-       << ")\n"
+       << "  vtype  = 0x" << std::hex << vtype << std::dec << "  ("
+       << (vill ? std::string("vill") : rvv::vtypeToString(vtype)) << ")\n"
        << "  vstart = " << registers.ReadCsr(csr_address::kVstart) << "\n"
        << "  vxrm   = " << registers.ReadCsr(csr_address::kVxrm) << "\n"
        << "  vxsat  = " << registers.ReadCsr(csr_address::kVxsat) << "\n"

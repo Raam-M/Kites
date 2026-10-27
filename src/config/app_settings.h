@@ -39,6 +39,24 @@ class AppSettings : public QObject
     BorderStyle compilerOutputBorderStyle() const;
     void setCompilerOutputBorderStyle(BorderStyle style);
 
+    // Vector extension (see processor/vector/vector_config.h). VLEN takes effect at the next
+    // processor reset; the other settings apply to the next instruction.
+    int vectorVlen() const;
+    void setVectorVlen(int vlen);
+    bool vectorAgnosticOnes() const;
+    void setVectorAgnosticOnes(bool ones);
+    /// Profile and extensions as a comma-separated list, e.g. "v,zvbb".
+    QString vectorExtensions() const;
+    void setVectorExtensions(const QString &list);
+    int vectorLanes() const;
+    void setVectorLanes(int lanes);
+    bool vectorChaining() const;
+    void setVectorChaining(bool chaining);
+
+    /// Copies the stored vector settings into rvv::config() and rvv::timingConfig(), falling
+    /// back to the defaults for invalid values.
+    void applyVectorSettings() const;
+
   signals:
     void compilerOutputBorderStyleChangedSignal(BorderStyle style);
 

@@ -27,6 +27,7 @@ enum class Icon
     Save,
     Settings,
     About,
+    Vector,
     IconCount
 };
 

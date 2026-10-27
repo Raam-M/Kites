@@ -33,6 +33,7 @@ class MainWindow : public QMainWindow
         CacheTabIndex,
         CompilerTabIndex,
         ProfilerTabIndex,
+        VectorTabIndex,
         TabCount
     };
 

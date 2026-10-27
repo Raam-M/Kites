@@ -19,5 +19,6 @@
         <file>save.svg</file>
         <file>settings.svg</file>
         <file>about.svg</file>
+        <file>vector.svg</file>
     </qresource>
 </RCC>
