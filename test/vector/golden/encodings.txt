@@ -1,0 +1,1249 @@
+# Golden RVV encodings produced by llvm-mc (tools/vector/gen_golden_encodings.py).
+# Format: <assembly>|<32-bit word>
+vsetivli a0, 31, e16, m4, tu, ma|0xc8aff557
+vsetivli a0, 0, e64, m8, ta, ma|0xcdb07557
+vsetvli a0, a1, e32, m2, ta, ma|0x0d15f557
+vsetvli t0, zero, e8, mf8, tu, mu|0x005072d7
+vsetvli zero, zero, e64, m1, ta, mu|0x05807057
+vsetvl a0, a1, a2|0x80c5f557
+vlm.v v8, (a0)|0x02b50407
+vsm.v v8, (a0)|0x02b50427
+vle8.v v8, (a0)|0x02050407
+vle8.v v8, (a0), v0.t|0x00050407
+vlseg2e8.v v8, (a0)|0x22050407
+vlseg2e8.v v8, (a0), v0.t|0x20050407
+vlseg3e8.v v8, (a0)|0x42050407
+vlseg3e8.v v8, (a0), v0.t|0x40050407
+vlseg4e8.v v8, (a0)|0x62050407
+vlseg4e8.v v8, (a0), v0.t|0x60050407
+vlseg5e8.v v8, (a0)|0x82050407
+vlseg5e8.v v8, (a0), v0.t|0x80050407
+vlseg6e8.v v8, (a0)|0xa2050407
+vlseg6e8.v v8, (a0), v0.t|0xa0050407
+vlseg7e8.v v8, (a0)|0xc2050407
+vlseg7e8.v v8, (a0), v0.t|0xc0050407
+vlseg8e8.v v8, (a0)|0xe2050407
+vlseg8e8.v v8, (a0), v0.t|0xe0050407
+vle16.v v8, (a0)|0x02055407
+vle16.v v8, (a0), v0.t|0x00055407
+vlseg2e16.v v8, (a0)|0x22055407
+vlseg2e16.v v8, (a0), v0.t|0x20055407
+vlseg3e16.v v8, (a0)|0x42055407
+vlseg3e16.v v8, (a0), v0.t|0x40055407
+vlseg4e16.v v8, (a0)|0x62055407
+vlseg4e16.v v8, (a0), v0.t|0x60055407
+vlseg5e16.v v8, (a0)|0x82055407
+vlseg5e16.v v8, (a0), v0.t|0x80055407
+vlseg6e16.v v8, (a0)|0xa2055407
+vlseg6e16.v v8, (a0), v0.t|0xa0055407
+vlseg7e16.v v8, (a0)|0xc2055407
+vlseg7e16.v v8, (a0), v0.t|0xc0055407
+vlseg8e16.v v8, (a0)|0xe2055407
+vlseg8e16.v v8, (a0), v0.t|0xe0055407
+vle32.v v8, (a0)|0x02056407
+vle32.v v8, (a0), v0.t|0x00056407
+vlseg2e32.v v8, (a0)|0x22056407
+vlseg2e32.v v8, (a0), v0.t|0x20056407
+vlseg3e32.v v8, (a0)|0x42056407
+vlseg3e32.v v8, (a0), v0.t|0x40056407
+vlseg4e32.v v8, (a0)|0x62056407
+vlseg4e32.v v8, (a0), v0.t|0x60056407
+vlseg5e32.v v8, (a0)|0x82056407
+vlseg5e32.v v8, (a0), v0.t|0x80056407
+vlseg6e32.v v8, (a0)|0xa2056407
+vlseg6e32.v v8, (a0), v0.t|0xa0056407
+vlseg7e32.v v8, (a0)|0xc2056407
+vlseg7e32.v v8, (a0), v0.t|0xc0056407
+vlseg8e32.v v8, (a0)|0xe2056407
+vlseg8e32.v v8, (a0), v0.t|0xe0056407
+vle64.v v8, (a0)|0x02057407
+vle64.v v8, (a0), v0.t|0x00057407
+vlseg2e64.v v8, (a0)|0x22057407
+vlseg2e64.v v8, (a0), v0.t|0x20057407
+vlseg3e64.v v8, (a0)|0x42057407
+vlseg3e64.v v8, (a0), v0.t|0x40057407
+vlseg4e64.v v8, (a0)|0x62057407
+vlseg4e64.v v8, (a0), v0.t|0x60057407
+vlseg5e64.v v8, (a0)|0x82057407
+vlseg5e64.v v8, (a0), v0.t|0x80057407
+vlseg6e64.v v8, (a0)|0xa2057407
+vlseg6e64.v v8, (a0), v0.t|0xa0057407
+vlseg7e64.v v8, (a0)|0xc2057407
+vlseg7e64.v v8, (a0), v0.t|0xc0057407
+vlseg8e64.v v8, (a0)|0xe2057407
+vlseg8e64.v v8, (a0), v0.t|0xe0057407
+vse8.v v8, (a0)|0x02050427
+vse8.v v8, (a0), v0.t|0x00050427
+vsseg2e8.v v8, (a0)|0x22050427
+vsseg2e8.v v8, (a0), v0.t|0x20050427
+vsseg3e8.v v8, (a0)|0x42050427
+vsseg3e8.v v8, (a0), v0.t|0x40050427
+vsseg4e8.v v8, (a0)|0x62050427
+vsseg4e8.v v8, (a0), v0.t|0x60050427
+vsseg5e8.v v8, (a0)|0x82050427
+vsseg5e8.v v8, (a0), v0.t|0x80050427
+vsseg6e8.v v8, (a0)|0xa2050427
+vsseg6e8.v v8, (a0), v0.t|0xa0050427
+vsseg7e8.v v8, (a0)|0xc2050427
+vsseg7e8.v v8, (a0), v0.t|0xc0050427
+vsseg8e8.v v8, (a0)|0xe2050427
+vsseg8e8.v v8, (a0), v0.t|0xe0050427
+vse16.v v8, (a0)|0x02055427
+vse16.v v8, (a0), v0.t|0x00055427
+vsseg2e16.v v8, (a0)|0x22055427
+vsseg2e16.v v8, (a0), v0.t|0x20055427
+vsseg3e16.v v8, (a0)|0x42055427
+vsseg3e16.v v8, (a0), v0.t|0x40055427
+vsseg4e16.v v8, (a0)|0x62055427
+vsseg4e16.v v8, (a0), v0.t|0x60055427
+vsseg5e16.v v8, (a0)|0x82055427
+vsseg5e16.v v8, (a0), v0.t|0x80055427
+vsseg6e16.v v8, (a0)|0xa2055427
+vsseg6e16.v v8, (a0), v0.t|0xa0055427
+vsseg7e16.v v8, (a0)|0xc2055427
+vsseg7e16.v v8, (a0), v0.t|0xc0055427
+vsseg8e16.v v8, (a0)|0xe2055427
+vsseg8e16.v v8, (a0), v0.t|0xe0055427
+vse32.v v8, (a0)|0x02056427
+vse32.v v8, (a0), v0.t|0x00056427
+vsseg2e32.v v8, (a0)|0x22056427
+vsseg2e32.v v8, (a0), v0.t|0x20056427
+vsseg3e32.v v8, (a0)|0x42056427
+vsseg3e32.v v8, (a0), v0.t|0x40056427
+vsseg4e32.v v8, (a0)|0x62056427
+vsseg4e32.v v8, (a0), v0.t|0x60056427
+vsseg5e32.v v8, (a0)|0x82056427
+vsseg5e32.v v8, (a0), v0.t|0x80056427
+vsseg6e32.v v8, (a0)|0xa2056427
+vsseg6e32.v v8, (a0), v0.t|0xa0056427
+vsseg7e32.v v8, (a0)|0xc2056427
+vsseg7e32.v v8, (a0), v0.t|0xc0056427
+vsseg8e32.v v8, (a0)|0xe2056427
+vsseg8e32.v v8, (a0), v0.t|0xe0056427
+vse64.v v8, (a0)|0x02057427
+vse64.v v8, (a0), v0.t|0x00057427
+vsseg2e64.v v8, (a0)|0x22057427
+vsseg2e64.v v8, (a0), v0.t|0x20057427
+vsseg3e64.v v8, (a0)|0x42057427
+vsseg3e64.v v8, (a0), v0.t|0x40057427
+vsseg4e64.v v8, (a0)|0x62057427
+vsseg4e64.v v8, (a0), v0.t|0x60057427
+vsseg5e64.v v8, (a0)|0x82057427
+vsseg5e64.v v8, (a0), v0.t|0x80057427
+vsseg6e64.v v8, (a0)|0xa2057427
+vsseg6e64.v v8, (a0), v0.t|0xa0057427
+vsseg7e64.v v8, (a0)|0xc2057427
+vsseg7e64.v v8, (a0), v0.t|0xc0057427
+vsseg8e64.v v8, (a0)|0xe2057427
+vsseg8e64.v v8, (a0), v0.t|0xe0057427
+vluxei8.v v8, (a0), v16|0x07050407
+vluxei8.v v8, (a0), v16, v0.t|0x05050407
+vluxseg2ei8.v v8, (a0), v16|0x27050407
+vluxseg2ei8.v v8, (a0), v16, v0.t|0x25050407
+vluxseg3ei8.v v8, (a0), v16|0x47050407
+vluxseg3ei8.v v8, (a0), v16, v0.t|0x45050407
+vluxseg4ei8.v v8, (a0), v16|0x67050407
+vluxseg4ei8.v v8, (a0), v16, v0.t|0x65050407
+vluxseg5ei8.v v8, (a0), v16|0x87050407
+vluxseg5ei8.v v8, (a0), v16, v0.t|0x85050407
+vluxseg6ei8.v v8, (a0), v16|0xa7050407
+vluxseg6ei8.v v8, (a0), v16, v0.t|0xa5050407
+vluxseg7ei8.v v8, (a0), v16|0xc7050407
+vluxseg7ei8.v v8, (a0), v16, v0.t|0xc5050407
+vluxseg8ei8.v v8, (a0), v16|0xe7050407
+vluxseg8ei8.v v8, (a0), v16, v0.t|0xe5050407
+vluxei16.v v8, (a0), v16|0x07055407
+vluxei16.v v8, (a0), v16, v0.t|0x05055407
+vluxseg2ei16.v v8, (a0), v16|0x27055407
+vluxseg2ei16.v v8, (a0), v16, v0.t|0x25055407
+vluxseg3ei16.v v8, (a0), v16|0x47055407
+vluxseg3ei16.v v8, (a0), v16, v0.t|0x45055407
+vluxseg4ei16.v v8, (a0), v16|0x67055407
+vluxseg4ei16.v v8, (a0), v16, v0.t|0x65055407
+vluxseg5ei16.v v8, (a0), v16|0x87055407
+vluxseg5ei16.v v8, (a0), v16, v0.t|0x85055407
+vluxseg6ei16.v v8, (a0), v16|0xa7055407
+vluxseg6ei16.v v8, (a0), v16, v0.t|0xa5055407
+vluxseg7ei16.v v8, (a0), v16|0xc7055407
+vluxseg7ei16.v v8, (a0), v16, v0.t|0xc5055407
+vluxseg8ei16.v v8, (a0), v16|0xe7055407
+vluxseg8ei16.v v8, (a0), v16, v0.t|0xe5055407
+vluxei32.v v8, (a0), v16|0x07056407
+vluxei32.v v8, (a0), v16, v0.t|0x05056407
+vluxseg2ei32.v v8, (a0), v16|0x27056407
+vluxseg2ei32.v v8, (a0), v16, v0.t|0x25056407
+vluxseg3ei32.v v8, (a0), v16|0x47056407
+vluxseg3ei32.v v8, (a0), v16, v0.t|0x45056407
+vluxseg4ei32.v v8, (a0), v16|0x67056407
+vluxseg4ei32.v v8, (a0), v16, v0.t|0x65056407
+vluxseg5ei32.v v8, (a0), v16|0x87056407
+vluxseg5ei32.v v8, (a0), v16, v0.t|0x85056407
+vluxseg6ei32.v v8, (a0), v16|0xa7056407
+vluxseg6ei32.v v8, (a0), v16, v0.t|0xa5056407
+vluxseg7ei32.v v8, (a0), v16|0xc7056407
+vluxseg7ei32.v v8, (a0), v16, v0.t|0xc5056407
+vluxseg8ei32.v v8, (a0), v16|0xe7056407
+vluxseg8ei32.v v8, (a0), v16, v0.t|0xe5056407
+vluxei64.v v8, (a0), v16|0x07057407
+vluxei64.v v8, (a0), v16, v0.t|0x05057407
+vluxseg2ei64.v v8, (a0), v16|0x27057407
+vluxseg2ei64.v v8, (a0), v16, v0.t|0x25057407
+vluxseg3ei64.v v8, (a0), v16|0x47057407
+vluxseg3ei64.v v8, (a0), v16, v0.t|0x45057407
+vluxseg4ei64.v v8, (a0), v16|0x67057407
+vluxseg4ei64.v v8, (a0), v16, v0.t|0x65057407
+vluxseg5ei64.v v8, (a0), v16|0x87057407
+vluxseg5ei64.v v8, (a0), v16, v0.t|0x85057407
+vluxseg6ei64.v v8, (a0), v16|0xa7057407
+vluxseg6ei64.v v8, (a0), v16, v0.t|0xa5057407
+vluxseg7ei64.v v8, (a0), v16|0xc7057407
+vluxseg7ei64.v v8, (a0), v16, v0.t|0xc5057407
+vluxseg8ei64.v v8, (a0), v16|0xe7057407
+vluxseg8ei64.v v8, (a0), v16, v0.t|0xe5057407
+vsuxei8.v v8, (a0), v16|0x07050427
+vsuxei8.v v8, (a0), v16, v0.t|0x05050427
+vsuxseg2ei8.v v8, (a0), v16|0x27050427
+vsuxseg2ei8.v v8, (a0), v16, v0.t|0x25050427
+vsuxseg3ei8.v v8, (a0), v16|0x47050427
+vsuxseg3ei8.v v8, (a0), v16, v0.t|0x45050427
+vsuxseg4ei8.v v8, (a0), v16|0x67050427
+vsuxseg4ei8.v v8, (a0), v16, v0.t|0x65050427
+vsuxseg5ei8.v v8, (a0), v16|0x87050427
+vsuxseg5ei8.v v8, (a0), v16, v0.t|0x85050427
+vsuxseg6ei8.v v8, (a0), v16|0xa7050427
+vsuxseg6ei8.v v8, (a0), v16, v0.t|0xa5050427
+vsuxseg7ei8.v v8, (a0), v16|0xc7050427
+vsuxseg7ei8.v v8, (a0), v16, v0.t|0xc5050427
+vsuxseg8ei8.v v8, (a0), v16|0xe7050427
+vsuxseg8ei8.v v8, (a0), v16, v0.t|0xe5050427
+vsuxei16.v v8, (a0), v16|0x07055427
+vsuxei16.v v8, (a0), v16, v0.t|0x05055427
+vsuxseg2ei16.v v8, (a0), v16|0x27055427
+vsuxseg2ei16.v v8, (a0), v16, v0.t|0x25055427
+vsuxseg3ei16.v v8, (a0), v16|0x47055427
+vsuxseg3ei16.v v8, (a0), v16, v0.t|0x45055427
+vsuxseg4ei16.v v8, (a0), v16|0x67055427
+vsuxseg4ei16.v v8, (a0), v16, v0.t|0x65055427
+vsuxseg5ei16.v v8, (a0), v16|0x87055427
+vsuxseg5ei16.v v8, (a0), v16, v0.t|0x85055427
+vsuxseg6ei16.v v8, (a0), v16|0xa7055427
+vsuxseg6ei16.v v8, (a0), v16, v0.t|0xa5055427
+vsuxseg7ei16.v v8, (a0), v16|0xc7055427
+vsuxseg7ei16.v v8, (a0), v16, v0.t|0xc5055427
+vsuxseg8ei16.v v8, (a0), v16|0xe7055427
+vsuxseg8ei16.v v8, (a0), v16, v0.t|0xe5055427
+vsuxei32.v v8, (a0), v16|0x07056427
+vsuxei32.v v8, (a0), v16, v0.t|0x05056427
+vsuxseg2ei32.v v8, (a0), v16|0x27056427
+vsuxseg2ei32.v v8, (a0), v16, v0.t|0x25056427
+vsuxseg3ei32.v v8, (a0), v16|0x47056427
+vsuxseg3ei32.v v8, (a0), v16, v0.t|0x45056427
+vsuxseg4ei32.v v8, (a0), v16|0x67056427
+vsuxseg4ei32.v v8, (a0), v16, v0.t|0x65056427
+vsuxseg5ei32.v v8, (a0), v16|0x87056427
+vsuxseg5ei32.v v8, (a0), v16, v0.t|0x85056427
+vsuxseg6ei32.v v8, (a0), v16|0xa7056427
+vsuxseg6ei32.v v8, (a0), v16, v0.t|0xa5056427
+vsuxseg7ei32.v v8, (a0), v16|0xc7056427
+vsuxseg7ei32.v v8, (a0), v16, v0.t|0xc5056427
+vsuxseg8ei32.v v8, (a0), v16|0xe7056427
+vsuxseg8ei32.v v8, (a0), v16, v0.t|0xe5056427
+vsuxei64.v v8, (a0), v16|0x07057427
+vsuxei64.v v8, (a0), v16, v0.t|0x05057427
+vsuxseg2ei64.v v8, (a0), v16|0x27057427
+vsuxseg2ei64.v v8, (a0), v16, v0.t|0x25057427
+vsuxseg3ei64.v v8, (a0), v16|0x47057427
+vsuxseg3ei64.v v8, (a0), v16, v0.t|0x45057427
+vsuxseg4ei64.v v8, (a0), v16|0x67057427
+vsuxseg4ei64.v v8, (a0), v16, v0.t|0x65057427
+vsuxseg5ei64.v v8, (a0), v16|0x87057427
+vsuxseg5ei64.v v8, (a0), v16, v0.t|0x85057427
+vsuxseg6ei64.v v8, (a0), v16|0xa7057427
+vsuxseg6ei64.v v8, (a0), v16, v0.t|0xa5057427
+vsuxseg7ei64.v v8, (a0), v16|0xc7057427
+vsuxseg7ei64.v v8, (a0), v16, v0.t|0xc5057427
+vsuxseg8ei64.v v8, (a0), v16|0xe7057427
+vsuxseg8ei64.v v8, (a0), v16, v0.t|0xe5057427
+vlse8.v v8, (a0), a1|0x0ab50407
+vlse8.v v8, (a0), a1, v0.t|0x08b50407
+vlsseg2e8.v v8, (a0), a1|0x2ab50407
+vlsseg2e8.v v8, (a0), a1, v0.t|0x28b50407
+vlsseg3e8.v v8, (a0), a1|0x4ab50407
+vlsseg3e8.v v8, (a0), a1, v0.t|0x48b50407
+vlsseg4e8.v v8, (a0), a1|0x6ab50407
+vlsseg4e8.v v8, (a0), a1, v0.t|0x68b50407
+vlsseg5e8.v v8, (a0), a1|0x8ab50407
+vlsseg5e8.v v8, (a0), a1, v0.t|0x88b50407
+vlsseg6e8.v v8, (a0), a1|0xaab50407
+vlsseg6e8.v v8, (a0), a1, v0.t|0xa8b50407
+vlsseg7e8.v v8, (a0), a1|0xcab50407
+vlsseg7e8.v v8, (a0), a1, v0.t|0xc8b50407
+vlsseg8e8.v v8, (a0), a1|0xeab50407
+vlsseg8e8.v v8, (a0), a1, v0.t|0xe8b50407
+vlse16.v v8, (a0), a1|0x0ab55407
+vlse16.v v8, (a0), a1, v0.t|0x08b55407
+vlsseg2e16.v v8, (a0), a1|0x2ab55407
+vlsseg2e16.v v8, (a0), a1, v0.t|0x28b55407
+vlsseg3e16.v v8, (a0), a1|0x4ab55407
+vlsseg3e16.v v8, (a0), a1, v0.t|0x48b55407
+vlsseg4e16.v v8, (a0), a1|0x6ab55407
+vlsseg4e16.v v8, (a0), a1, v0.t|0x68b55407
+vlsseg5e16.v v8, (a0), a1|0x8ab55407
+vlsseg5e16.v v8, (a0), a1, v0.t|0x88b55407
+vlsseg6e16.v v8, (a0), a1|0xaab55407
+vlsseg6e16.v v8, (a0), a1, v0.t|0xa8b55407
+vlsseg7e16.v v8, (a0), a1|0xcab55407
+vlsseg7e16.v v8, (a0), a1, v0.t|0xc8b55407
+vlsseg8e16.v v8, (a0), a1|0xeab55407
+vlsseg8e16.v v8, (a0), a1, v0.t|0xe8b55407
+vlse32.v v8, (a0), a1|0x0ab56407
+vlse32.v v8, (a0), a1, v0.t|0x08b56407
+vlsseg2e32.v v8, (a0), a1|0x2ab56407
+vlsseg2e32.v v8, (a0), a1, v0.t|0x28b56407
+vlsseg3e32.v v8, (a0), a1|0x4ab56407
+vlsseg3e32.v v8, (a0), a1, v0.t|0x48b56407
+vlsseg4e32.v v8, (a0), a1|0x6ab56407
+vlsseg4e32.v v8, (a0), a1, v0.t|0x68b56407
+vlsseg5e32.v v8, (a0), a1|0x8ab56407
+vlsseg5e32.v v8, (a0), a1, v0.t|0x88b56407
+vlsseg6e32.v v8, (a0), a1|0xaab56407
+vlsseg6e32.v v8, (a0), a1, v0.t|0xa8b56407
+vlsseg7e32.v v8, (a0), a1|0xcab56407
+vlsseg7e32.v v8, (a0), a1, v0.t|0xc8b56407
+vlsseg8e32.v v8, (a0), a1|0xeab56407
+vlsseg8e32.v v8, (a0), a1, v0.t|0xe8b56407
+vlse64.v v8, (a0), a1|0x0ab57407
+vlse64.v v8, (a0), a1, v0.t|0x08b57407
+vlsseg2e64.v v8, (a0), a1|0x2ab57407
+vlsseg2e64.v v8, (a0), a1, v0.t|0x28b57407
+vlsseg3e64.v v8, (a0), a1|0x4ab57407
+vlsseg3e64.v v8, (a0), a1, v0.t|0x48b57407
+vlsseg4e64.v v8, (a0), a1|0x6ab57407
+vlsseg4e64.v v8, (a0), a1, v0.t|0x68b57407
+vlsseg5e64.v v8, (a0), a1|0x8ab57407
+vlsseg5e64.v v8, (a0), a1, v0.t|0x88b57407
+vlsseg6e64.v v8, (a0), a1|0xaab57407
+vlsseg6e64.v v8, (a0), a1, v0.t|0xa8b57407
+vlsseg7e64.v v8, (a0), a1|0xcab57407
+vlsseg7e64.v v8, (a0), a1, v0.t|0xc8b57407
+vlsseg8e64.v v8, (a0), a1|0xeab57407
+vlsseg8e64.v v8, (a0), a1, v0.t|0xe8b57407
+vsse8.v v8, (a0), a1|0x0ab50427
+vsse8.v v8, (a0), a1, v0.t|0x08b50427
+vssseg2e8.v v8, (a0), a1|0x2ab50427
+vssseg2e8.v v8, (a0), a1, v0.t|0x28b50427
+vssseg3e8.v v8, (a0), a1|0x4ab50427
+vssseg3e8.v v8, (a0), a1, v0.t|0x48b50427
+vssseg4e8.v v8, (a0), a1|0x6ab50427
+vssseg4e8.v v8, (a0), a1, v0.t|0x68b50427
+vssseg5e8.v v8, (a0), a1|0x8ab50427
+vssseg5e8.v v8, (a0), a1, v0.t|0x88b50427
+vssseg6e8.v v8, (a0), a1|0xaab50427
+vssseg6e8.v v8, (a0), a1, v0.t|0xa8b50427
+vssseg7e8.v v8, (a0), a1|0xcab50427
+vssseg7e8.v v8, (a0), a1, v0.t|0xc8b50427
+vssseg8e8.v v8, (a0), a1|0xeab50427
+vssseg8e8.v v8, (a0), a1, v0.t|0xe8b50427
+vsse16.v v8, (a0), a1|0x0ab55427
+vsse16.v v8, (a0), a1, v0.t|0x08b55427
+vssseg2e16.v v8, (a0), a1|0x2ab55427
+vssseg2e16.v v8, (a0), a1, v0.t|0x28b55427
+vssseg3e16.v v8, (a0), a1|0x4ab55427
+vssseg3e16.v v8, (a0), a1, v0.t|0x48b55427
+vssseg4e16.v v8, (a0), a1|0x6ab55427
+vssseg4e16.v v8, (a0), a1, v0.t|0x68b55427
+vssseg5e16.v v8, (a0), a1|0x8ab55427
+vssseg5e16.v v8, (a0), a1, v0.t|0x88b55427
+vssseg6e16.v v8, (a0), a1|0xaab55427
+vssseg6e16.v v8, (a0), a1, v0.t|0xa8b55427
+vssseg7e16.v v8, (a0), a1|0xcab55427
+vssseg7e16.v v8, (a0), a1, v0.t|0xc8b55427
+vssseg8e16.v v8, (a0), a1|0xeab55427
+vssseg8e16.v v8, (a0), a1, v0.t|0xe8b55427
+vsse32.v v8, (a0), a1|0x0ab56427
+vsse32.v v8, (a0), a1, v0.t|0x08b56427
+vssseg2e32.v v8, (a0), a1|0x2ab56427
+vssseg2e32.v v8, (a0), a1, v0.t|0x28b56427
+vssseg3e32.v v8, (a0), a1|0x4ab56427
+vssseg3e32.v v8, (a0), a1, v0.t|0x48b56427
+vssseg4e32.v v8, (a0), a1|0x6ab56427
+vssseg4e32.v v8, (a0), a1, v0.t|0x68b56427
+vssseg5e32.v v8, (a0), a1|0x8ab56427
+vssseg5e32.v v8, (a0), a1, v0.t|0x88b56427
+vssseg6e32.v v8, (a0), a1|0xaab56427
+vssseg6e32.v v8, (a0), a1, v0.t|0xa8b56427
+vssseg7e32.v v8, (a0), a1|0xcab56427
+vssseg7e32.v v8, (a0), a1, v0.t|0xc8b56427
+vssseg8e32.v v8, (a0), a1|0xeab56427
+vssseg8e32.v v8, (a0), a1, v0.t|0xe8b56427
+vsse64.v v8, (a0), a1|0x0ab57427
+vsse64.v v8, (a0), a1, v0.t|0x08b57427
+vssseg2e64.v v8, (a0), a1|0x2ab57427
+vssseg2e64.v v8, (a0), a1, v0.t|0x28b57427
+vssseg3e64.v v8, (a0), a1|0x4ab57427
+vssseg3e64.v v8, (a0), a1, v0.t|0x48b57427
+vssseg4e64.v v8, (a0), a1|0x6ab57427
+vssseg4e64.v v8, (a0), a1, v0.t|0x68b57427
+vssseg5e64.v v8, (a0), a1|0x8ab57427
+vssseg5e64.v v8, (a0), a1, v0.t|0x88b57427
+vssseg6e64.v v8, (a0), a1|0xaab57427
+vssseg6e64.v v8, (a0), a1, v0.t|0xa8b57427
+vssseg7e64.v v8, (a0), a1|0xcab57427
+vssseg7e64.v v8, (a0), a1, v0.t|0xc8b57427
+vssseg8e64.v v8, (a0), a1|0xeab57427
+vssseg8e64.v v8, (a0), a1, v0.t|0xe8b57427
+vloxei8.v v8, (a0), v16|0x0f050407
+vloxei8.v v8, (a0), v16, v0.t|0x0d050407
+vloxseg2ei8.v v8, (a0), v16|0x2f050407
+vloxseg2ei8.v v8, (a0), v16, v0.t|0x2d050407
+vloxseg3ei8.v v8, (a0), v16|0x4f050407
+vloxseg3ei8.v v8, (a0), v16, v0.t|0x4d050407
+vloxseg4ei8.v v8, (a0), v16|0x6f050407
+vloxseg4ei8.v v8, (a0), v16, v0.t|0x6d050407
+vloxseg5ei8.v v8, (a0), v16|0x8f050407
+vloxseg5ei8.v v8, (a0), v16, v0.t|0x8d050407
+vloxseg6ei8.v v8, (a0), v16|0xaf050407
+vloxseg6ei8.v v8, (a0), v16, v0.t|0xad050407
+vloxseg7ei8.v v8, (a0), v16|0xcf050407
+vloxseg7ei8.v v8, (a0), v16, v0.t|0xcd050407
+vloxseg8ei8.v v8, (a0), v16|0xef050407
+vloxseg8ei8.v v8, (a0), v16, v0.t|0xed050407
+vloxei16.v v8, (a0), v16|0x0f055407
+vloxei16.v v8, (a0), v16, v0.t|0x0d055407
+vloxseg2ei16.v v8, (a0), v16|0x2f055407
+vloxseg2ei16.v v8, (a0), v16, v0.t|0x2d055407
+vloxseg3ei16.v v8, (a0), v16|0x4f055407
+vloxseg3ei16.v v8, (a0), v16, v0.t|0x4d055407
+vloxseg4ei16.v v8, (a0), v16|0x6f055407
+vloxseg4ei16.v v8, (a0), v16, v0.t|0x6d055407
+vloxseg5ei16.v v8, (a0), v16|0x8f055407
+vloxseg5ei16.v v8, (a0), v16, v0.t|0x8d055407
+vloxseg6ei16.v v8, (a0), v16|0xaf055407
+vloxseg6ei16.v v8, (a0), v16, v0.t|0xad055407
+vloxseg7ei16.v v8, (a0), v16|0xcf055407
+vloxseg7ei16.v v8, (a0), v16, v0.t|0xcd055407
+vloxseg8ei16.v v8, (a0), v16|0xef055407
+vloxseg8ei16.v v8, (a0), v16, v0.t|0xed055407
+vloxei32.v v8, (a0), v16|0x0f056407
+vloxei32.v v8, (a0), v16, v0.t|0x0d056407
+vloxseg2ei32.v v8, (a0), v16|0x2f056407
+vloxseg2ei32.v v8, (a0), v16, v0.t|0x2d056407
+vloxseg3ei32.v v8, (a0), v16|0x4f056407
+vloxseg3ei32.v v8, (a0), v16, v0.t|0x4d056407
+vloxseg4ei32.v v8, (a0), v16|0x6f056407
+vloxseg4ei32.v v8, (a0), v16, v0.t|0x6d056407
+vloxseg5ei32.v v8, (a0), v16|0x8f056407
+vloxseg5ei32.v v8, (a0), v16, v0.t|0x8d056407
+vloxseg6ei32.v v8, (a0), v16|0xaf056407
+vloxseg6ei32.v v8, (a0), v16, v0.t|0xad056407
+vloxseg7ei32.v v8, (a0), v16|0xcf056407
+vloxseg7ei32.v v8, (a0), v16, v0.t|0xcd056407
+vloxseg8ei32.v v8, (a0), v16|0xef056407
+vloxseg8ei32.v v8, (a0), v16, v0.t|0xed056407
+vloxei64.v v8, (a0), v16|0x0f057407
+vloxei64.v v8, (a0), v16, v0.t|0x0d057407
+vloxseg2ei64.v v8, (a0), v16|0x2f057407
+vloxseg2ei64.v v8, (a0), v16, v0.t|0x2d057407
+vloxseg3ei64.v v8, (a0), v16|0x4f057407
+vloxseg3ei64.v v8, (a0), v16, v0.t|0x4d057407
+vloxseg4ei64.v v8, (a0), v16|0x6f057407
+vloxseg4ei64.v v8, (a0), v16, v0.t|0x6d057407
+vloxseg5ei64.v v8, (a0), v16|0x8f057407
+vloxseg5ei64.v v8, (a0), v16, v0.t|0x8d057407
+vloxseg6ei64.v v8, (a0), v16|0xaf057407
+vloxseg6ei64.v v8, (a0), v16, v0.t|0xad057407
+vloxseg7ei64.v v8, (a0), v16|0xcf057407
+vloxseg7ei64.v v8, (a0), v16, v0.t|0xcd057407
+vloxseg8ei64.v v8, (a0), v16|0xef057407
+vloxseg8ei64.v v8, (a0), v16, v0.t|0xed057407
+vsoxei8.v v8, (a0), v16|0x0f050427
+vsoxei8.v v8, (a0), v16, v0.t|0x0d050427
+vsoxseg2ei8.v v8, (a0), v16|0x2f050427
+vsoxseg2ei8.v v8, (a0), v16, v0.t|0x2d050427
+vsoxseg3ei8.v v8, (a0), v16|0x4f050427
+vsoxseg3ei8.v v8, (a0), v16, v0.t|0x4d050427
+vsoxseg4ei8.v v8, (a0), v16|0x6f050427
+vsoxseg4ei8.v v8, (a0), v16, v0.t|0x6d050427
+vsoxseg5ei8.v v8, (a0), v16|0x8f050427
+vsoxseg5ei8.v v8, (a0), v16, v0.t|0x8d050427
+vsoxseg6ei8.v v8, (a0), v16|0xaf050427
+vsoxseg6ei8.v v8, (a0), v16, v0.t|0xad050427
+vsoxseg7ei8.v v8, (a0), v16|0xcf050427
+vsoxseg7ei8.v v8, (a0), v16, v0.t|0xcd050427
+vsoxseg8ei8.v v8, (a0), v16|0xef050427
+vsoxseg8ei8.v v8, (a0), v16, v0.t|0xed050427
+vsoxei16.v v8, (a0), v16|0x0f055427
+vsoxei16.v v8, (a0), v16, v0.t|0x0d055427
+vsoxseg2ei16.v v8, (a0), v16|0x2f055427
+vsoxseg2ei16.v v8, (a0), v16, v0.t|0x2d055427
+vsoxseg3ei16.v v8, (a0), v16|0x4f055427
+vsoxseg3ei16.v v8, (a0), v16, v0.t|0x4d055427
+vsoxseg4ei16.v v8, (a0), v16|0x6f055427
+vsoxseg4ei16.v v8, (a0), v16, v0.t|0x6d055427
+vsoxseg5ei16.v v8, (a0), v16|0x8f055427
+vsoxseg5ei16.v v8, (a0), v16, v0.t|0x8d055427
+vsoxseg6ei16.v v8, (a0), v16|0xaf055427
+vsoxseg6ei16.v v8, (a0), v16, v0.t|0xad055427
+vsoxseg7ei16.v v8, (a0), v16|0xcf055427
+vsoxseg7ei16.v v8, (a0), v16, v0.t|0xcd055427
+vsoxseg8ei16.v v8, (a0), v16|0xef055427
+vsoxseg8ei16.v v8, (a0), v16, v0.t|0xed055427
+vsoxei32.v v8, (a0), v16|0x0f056427
+vsoxei32.v v8, (a0), v16, v0.t|0x0d056427
+vsoxseg2ei32.v v8, (a0), v16|0x2f056427
+vsoxseg2ei32.v v8, (a0), v16, v0.t|0x2d056427
+vsoxseg3ei32.v v8, (a0), v16|0x4f056427
+vsoxseg3ei32.v v8, (a0), v16, v0.t|0x4d056427
+vsoxseg4ei32.v v8, (a0), v16|0x6f056427
+vsoxseg4ei32.v v8, (a0), v16, v0.t|0x6d056427
+vsoxseg5ei32.v v8, (a0), v16|0x8f056427
+vsoxseg5ei32.v v8, (a0), v16, v0.t|0x8d056427
+vsoxseg6ei32.v v8, (a0), v16|0xaf056427
+vsoxseg6ei32.v v8, (a0), v16, v0.t|0xad056427
+vsoxseg7ei32.v v8, (a0), v16|0xcf056427
+vsoxseg7ei32.v v8, (a0), v16, v0.t|0xcd056427
+vsoxseg8ei32.v v8, (a0), v16|0xef056427
+vsoxseg8ei32.v v8, (a0), v16, v0.t|0xed056427
+vsoxei64.v v8, (a0), v16|0x0f057427
+vsoxei64.v v8, (a0), v16, v0.t|0x0d057427
+vsoxseg2ei64.v v8, (a0), v16|0x2f057427
+vsoxseg2ei64.v v8, (a0), v16, v0.t|0x2d057427
+vsoxseg3ei64.v v8, (a0), v16|0x4f057427
+vsoxseg3ei64.v v8, (a0), v16, v0.t|0x4d057427
+vsoxseg4ei64.v v8, (a0), v16|0x6f057427
+vsoxseg4ei64.v v8, (a0), v16, v0.t|0x6d057427
+vsoxseg5ei64.v v8, (a0), v16|0x8f057427
+vsoxseg5ei64.v v8, (a0), v16, v0.t|0x8d057427
+vsoxseg6ei64.v v8, (a0), v16|0xaf057427
+vsoxseg6ei64.v v8, (a0), v16, v0.t|0xad057427
+vsoxseg7ei64.v v8, (a0), v16|0xcf057427
+vsoxseg7ei64.v v8, (a0), v16, v0.t|0xcd057427
+vsoxseg8ei64.v v8, (a0), v16|0xef057427
+vsoxseg8ei64.v v8, (a0), v16, v0.t|0xed057427
+vle8ff.v v8, (a0)|0x03050407
+vle8ff.v v8, (a0), v0.t|0x01050407
+vlseg2e8ff.v v8, (a0)|0x23050407
+vlseg2e8ff.v v8, (a0), v0.t|0x21050407
+vlseg3e8ff.v v8, (a0)|0x43050407
+vlseg3e8ff.v v8, (a0), v0.t|0x41050407
+vlseg4e8ff.v v8, (a0)|0x63050407
+vlseg4e8ff.v v8, (a0), v0.t|0x61050407
+vlseg5e8ff.v v8, (a0)|0x83050407
+vlseg5e8ff.v v8, (a0), v0.t|0x81050407
+vlseg6e8ff.v v8, (a0)|0xa3050407
+vlseg6e8ff.v v8, (a0), v0.t|0xa1050407
+vlseg7e8ff.v v8, (a0)|0xc3050407
+vlseg7e8ff.v v8, (a0), v0.t|0xc1050407
+vlseg8e8ff.v v8, (a0)|0xe3050407
+vlseg8e8ff.v v8, (a0), v0.t|0xe1050407
+vle16ff.v v8, (a0)|0x03055407
+vle16ff.v v8, (a0), v0.t|0x01055407
+vlseg2e16ff.v v8, (a0)|0x23055407
+vlseg2e16ff.v v8, (a0), v0.t|0x21055407
+vlseg3e16ff.v v8, (a0)|0x43055407
+vlseg3e16ff.v v8, (a0), v0.t|0x41055407
+vlseg4e16ff.v v8, (a0)|0x63055407
+vlseg4e16ff.v v8, (a0), v0.t|0x61055407
+vlseg5e16ff.v v8, (a0)|0x83055407
+vlseg5e16ff.v v8, (a0), v0.t|0x81055407
+vlseg6e16ff.v v8, (a0)|0xa3055407
+vlseg6e16ff.v v8, (a0), v0.t|0xa1055407
+vlseg7e16ff.v v8, (a0)|0xc3055407
+vlseg7e16ff.v v8, (a0), v0.t|0xc1055407
+vlseg8e16ff.v v8, (a0)|0xe3055407
+vlseg8e16ff.v v8, (a0), v0.t|0xe1055407
+vle32ff.v v8, (a0)|0x03056407
+vle32ff.v v8, (a0), v0.t|0x01056407
+vlseg2e32ff.v v8, (a0)|0x23056407
+vlseg2e32ff.v v8, (a0), v0.t|0x21056407
+vlseg3e32ff.v v8, (a0)|0x43056407
+vlseg3e32ff.v v8, (a0), v0.t|0x41056407
+vlseg4e32ff.v v8, (a0)|0x63056407
+vlseg4e32ff.v v8, (a0), v0.t|0x61056407
+vlseg5e32ff.v v8, (a0)|0x83056407
+vlseg5e32ff.v v8, (a0), v0.t|0x81056407
+vlseg6e32ff.v v8, (a0)|0xa3056407
+vlseg6e32ff.v v8, (a0), v0.t|0xa1056407
+vlseg7e32ff.v v8, (a0)|0xc3056407
+vlseg7e32ff.v v8, (a0), v0.t|0xc1056407
+vlseg8e32ff.v v8, (a0)|0xe3056407
+vlseg8e32ff.v v8, (a0), v0.t|0xe1056407
+vle64ff.v v8, (a0)|0x03057407
+vle64ff.v v8, (a0), v0.t|0x01057407
+vlseg2e64ff.v v8, (a0)|0x23057407
+vlseg2e64ff.v v8, (a0), v0.t|0x21057407
+vlseg3e64ff.v v8, (a0)|0x43057407
+vlseg3e64ff.v v8, (a0), v0.t|0x41057407
+vlseg4e64ff.v v8, (a0)|0x63057407
+vlseg4e64ff.v v8, (a0), v0.t|0x61057407
+vlseg5e64ff.v v8, (a0)|0x83057407
+vlseg5e64ff.v v8, (a0), v0.t|0x81057407
+vlseg6e64ff.v v8, (a0)|0xa3057407
+vlseg6e64ff.v v8, (a0), v0.t|0xa1057407
+vlseg7e64ff.v v8, (a0)|0xc3057407
+vlseg7e64ff.v v8, (a0), v0.t|0xc1057407
+vlseg8e64ff.v v8, (a0)|0xe3057407
+vlseg8e64ff.v v8, (a0), v0.t|0xe1057407
+vl1re8.v v8, (a0)|0x02850407
+vl1re16.v v8, (a0)|0x02855407
+vl1re32.v v8, (a0)|0x02856407
+vl1re64.v v8, (a0)|0x02857407
+vl2re8.v v8, (a0)|0x22850407
+vl2re16.v v8, (a0)|0x22855407
+vl2re32.v v8, (a0)|0x22856407
+vl2re64.v v8, (a0)|0x22857407
+vl4re8.v v8, (a0)|0x62850407
+vl4re16.v v8, (a0)|0x62855407
+vl4re32.v v8, (a0)|0x62856407
+vl4re64.v v8, (a0)|0x62857407
+vl8re8.v v8, (a0)|0xe2850407
+vl8re16.v v8, (a0)|0xe2855407
+vl8re32.v v8, (a0)|0xe2856407
+vl8re64.v v8, (a0)|0xe2857407
+vs1r.v v8, (a0)|0x02850427
+vs2r.v v8, (a0)|0x22850427
+vs4r.v v8, (a0)|0x62850427
+vs8r.v v8, (a0)|0xe2850427
+vfadd.vf v8, v16, fa1|0x0305d457
+vfadd.vf v8, v16, fa1, v0.t|0x0105d457
+vfsub.vf v8, v16, fa1|0x0b05d457
+vfsub.vf v8, v16, fa1, v0.t|0x0905d457
+vfmin.vf v8, v16, fa1|0x1305d457
+vfmin.vf v8, v16, fa1, v0.t|0x1105d457
+vfmax.vf v8, v16, fa1|0x1b05d457
+vfmax.vf v8, v16, fa1, v0.t|0x1905d457
+vfsgnj.vf v8, v16, fa1|0x2305d457
+vfsgnj.vf v8, v16, fa1, v0.t|0x2105d457
+vfsgnjn.vf v8, v16, fa1|0x2705d457
+vfsgnjn.vf v8, v16, fa1, v0.t|0x2505d457
+vfsgnjx.vf v8, v16, fa1|0x2b05d457
+vfsgnjx.vf v8, v16, fa1, v0.t|0x2905d457
+vfslide1up.vf v8, v16, fa1|0x3b05d457
+vfslide1up.vf v8, v16, fa1, v0.t|0x3905d457
+vfslide1down.vf v8, v16, fa1|0x3f05d457
+vfslide1down.vf v8, v16, fa1, v0.t|0x3d05d457
+vfmv.s.f v8, fa1|0x4205d457
+vfmerge.vfm v8, v16, fa1, v0|0x5d05d457
+vfmv.v.f v8, fa1|0x5e05d457
+vmfeq.vf v8, v16, fa1|0x6305d457
+vmfeq.vf v8, v16, fa1, v0.t|0x6105d457
+vmfle.vf v8, v16, fa1|0x6705d457
+vmfle.vf v8, v16, fa1, v0.t|0x6505d457
+vmflt.vf v8, v16, fa1|0x6f05d457
+vmflt.vf v8, v16, fa1, v0.t|0x6d05d457
+vmfne.vf v8, v16, fa1|0x7305d457
+vmfne.vf v8, v16, fa1, v0.t|0x7105d457
+vmfgt.vf v8, v16, fa1|0x7705d457
+vmfgt.vf v8, v16, fa1, v0.t|0x7505d457
+vmfge.vf v8, v16, fa1|0x7f05d457
+vmfge.vf v8, v16, fa1, v0.t|0x7d05d457
+vfdiv.vf v8, v16, fa1|0x8305d457
+vfdiv.vf v8, v16, fa1, v0.t|0x8105d457
+vfrdiv.vf v8, v16, fa1|0x8705d457
+vfrdiv.vf v8, v16, fa1, v0.t|0x8505d457
+vfmul.vf v8, v16, fa1|0x9305d457
+vfmul.vf v8, v16, fa1, v0.t|0x9105d457
+vfrsub.vf v8, v16, fa1|0x9f05d457
+vfrsub.vf v8, v16, fa1, v0.t|0x9d05d457
+vfmadd.vf v8, fa1, v16|0xa305d457
+vfmadd.vf v8, fa1, v16, v0.t|0xa105d457
+vfnmadd.vf v8, fa1, v16|0xa705d457
+vfnmadd.vf v8, fa1, v16, v0.t|0xa505d457
+vfmsub.vf v8, fa1, v16|0xab05d457
+vfmsub.vf v8, fa1, v16, v0.t|0xa905d457
+vfnmsub.vf v8, fa1, v16|0xaf05d457
+vfnmsub.vf v8, fa1, v16, v0.t|0xad05d457
+vfmacc.vf v8, fa1, v16|0xb305d457
+vfmacc.vf v8, fa1, v16, v0.t|0xb105d457
+vfnmacc.vf v8, fa1, v16|0xb705d457
+vfnmacc.vf v8, fa1, v16, v0.t|0xb505d457
+vfmsac.vf v8, fa1, v16|0xbb05d457
+vfmsac.vf v8, fa1, v16, v0.t|0xb905d457
+vfnmsac.vf v8, fa1, v16|0xbf05d457
+vfnmsac.vf v8, fa1, v16, v0.t|0xbd05d457
+vfwadd.vf v8, v16, fa1|0xc305d457
+vfwadd.vf v8, v16, fa1, v0.t|0xc105d457
+vfwsub.vf v8, v16, fa1|0xcb05d457
+vfwsub.vf v8, v16, fa1, v0.t|0xc905d457
+vfwadd.wf v8, v16, fa1|0xd305d457
+vfwadd.wf v8, v16, fa1, v0.t|0xd105d457
+vfwsub.wf v8, v16, fa1|0xdb05d457
+vfwsub.wf v8, v16, fa1, v0.t|0xd905d457
+vfwmul.vf v8, v16, fa1|0xe305d457
+vfwmul.vf v8, v16, fa1, v0.t|0xe105d457
+vfwmacc.vf v8, fa1, v16|0xf305d457
+vfwmacc.vf v8, fa1, v16, v0.t|0xf105d457
+vfwnmacc.vf v8, fa1, v16|0xf705d457
+vfwnmacc.vf v8, fa1, v16, v0.t|0xf505d457
+vfwmsac.vf v8, fa1, v16|0xfb05d457
+vfwmsac.vf v8, fa1, v16, v0.t|0xf905d457
+vfwnmsac.vf v8, fa1, v16|0xff05d457
+vfwnmsac.vf v8, fa1, v16, v0.t|0xfd05d457
+vfadd.vv v8, v16, v24|0x030c1457
+vfadd.vv v8, v16, v24, v0.t|0x010c1457
+vfredusum.vs v8, v16, v24|0x070c1457
+vfredusum.vs v8, v16, v24, v0.t|0x050c1457
+vfsub.vv v8, v16, v24|0x0b0c1457
+vfsub.vv v8, v16, v24, v0.t|0x090c1457
+vfredosum.vs v8, v16, v24|0x0f0c1457
+vfredosum.vs v8, v16, v24, v0.t|0x0d0c1457
+vfmin.vv v8, v16, v24|0x130c1457
+vfmin.vv v8, v16, v24, v0.t|0x110c1457
+vfredmin.vs v8, v16, v24|0x170c1457
+vfredmin.vs v8, v16, v24, v0.t|0x150c1457
+vfmax.vv v8, v16, v24|0x1b0c1457
+vfmax.vv v8, v16, v24, v0.t|0x190c1457
+vfredmax.vs v8, v16, v24|0x1f0c1457
+vfredmax.vs v8, v16, v24, v0.t|0x1d0c1457
+vfsgnj.vv v8, v16, v24|0x230c1457
+vfsgnj.vv v8, v16, v24, v0.t|0x210c1457
+vfsgnjn.vv v8, v16, v24|0x270c1457
+vfsgnjn.vv v8, v16, v24, v0.t|0x250c1457
+vfsgnjx.vv v8, v16, v24|0x2b0c1457
+vfsgnjx.vv v8, v16, v24, v0.t|0x290c1457
+vfmv.f.s fa0, v16|0x43001557
+vmfeq.vv v8, v16, v24|0x630c1457
+vmfeq.vv v8, v16, v24, v0.t|0x610c1457
+vmfle.vv v8, v16, v24|0x670c1457
+vmfle.vv v8, v16, v24, v0.t|0x650c1457
+vmflt.vv v8, v16, v24|0x6f0c1457
+vmflt.vv v8, v16, v24, v0.t|0x6d0c1457
+vmfne.vv v8, v16, v24|0x730c1457
+vmfne.vv v8, v16, v24, v0.t|0x710c1457
+vfdiv.vv v8, v16, v24|0x830c1457
+vfdiv.vv v8, v16, v24, v0.t|0x810c1457
+vfmul.vv v8, v16, v24|0x930c1457
+vfmul.vv v8, v16, v24, v0.t|0x910c1457
+vfmadd.vv v8, v24, v16|0xa30c1457
+vfmadd.vv v8, v24, v16, v0.t|0xa10c1457
+vfnmadd.vv v8, v24, v16|0xa70c1457
+vfnmadd.vv v8, v24, v16, v0.t|0xa50c1457
+vfmsub.vv v8, v24, v16|0xab0c1457
+vfmsub.vv v8, v24, v16, v0.t|0xa90c1457
+vfnmsub.vv v8, v24, v16|0xaf0c1457
+vfnmsub.vv v8, v24, v16, v0.t|0xad0c1457
+vfmacc.vv v8, v24, v16|0xb30c1457
+vfmacc.vv v8, v24, v16, v0.t|0xb10c1457
+vfnmacc.vv v8, v24, v16|0xb70c1457
+vfnmacc.vv v8, v24, v16, v0.t|0xb50c1457
+vfmsac.vv v8, v24, v16|0xbb0c1457
+vfmsac.vv v8, v24, v16, v0.t|0xb90c1457
+vfnmsac.vv v8, v24, v16|0xbf0c1457
+vfnmsac.vv v8, v24, v16, v0.t|0xbd0c1457
+vfcvt.xu.f.v v8, v16|0x4b001457
+vfcvt.xu.f.v v8, v16, v0.t|0x49001457
+vfcvt.x.f.v v8, v16|0x4b009457
+vfcvt.x.f.v v8, v16, v0.t|0x49009457
+vfcvt.f.xu.v v8, v16|0x4b011457
+vfcvt.f.xu.v v8, v16, v0.t|0x49011457
+vfcvt.f.x.v v8, v16|0x4b019457
+vfcvt.f.x.v v8, v16, v0.t|0x49019457
+vfcvt.rtz.xu.f.v v8, v16|0x4b031457
+vfcvt.rtz.xu.f.v v8, v16, v0.t|0x49031457
+vfcvt.rtz.x.f.v v8, v16|0x4b039457
+vfcvt.rtz.x.f.v v8, v16, v0.t|0x49039457
+vfwcvt.xu.f.v v8, v16|0x4b041457
+vfwcvt.xu.f.v v8, v16, v0.t|0x49041457
+vfwcvt.x.f.v v8, v16|0x4b049457
+vfwcvt.x.f.v v8, v16, v0.t|0x49049457
+vfwcvt.f.xu.v v8, v16|0x4b051457
+vfwcvt.f.xu.v v8, v16, v0.t|0x49051457
+vfwcvt.f.x.v v8, v16|0x4b059457
+vfwcvt.f.x.v v8, v16, v0.t|0x49059457
+vfwcvt.f.f.v v8, v16|0x4b061457
+vfwcvt.f.f.v v8, v16, v0.t|0x49061457
+vfwcvt.rtz.xu.f.v v8, v16|0x4b071457
+vfwcvt.rtz.xu.f.v v8, v16, v0.t|0x49071457
+vfwcvt.rtz.x.f.v v8, v16|0x4b079457
+vfwcvt.rtz.x.f.v v8, v16, v0.t|0x49079457
+vfncvt.xu.f.w v8, v16|0x4b081457
+vfncvt.xu.f.w v8, v16, v0.t|0x49081457
+vfncvt.x.f.w v8, v16|0x4b089457
+vfncvt.x.f.w v8, v16, v0.t|0x49089457
+vfncvt.f.xu.w v8, v16|0x4b091457
+vfncvt.f.xu.w v8, v16, v0.t|0x49091457
+vfncvt.f.x.w v8, v16|0x4b099457
+vfncvt.f.x.w v8, v16, v0.t|0x49099457
+vfncvt.f.f.w v8, v16|0x4b0a1457
+vfncvt.f.f.w v8, v16, v0.t|0x490a1457
+vfncvt.rod.f.f.w v8, v16|0x4b0a9457
+vfncvt.rod.f.f.w v8, v16, v0.t|0x490a9457
+vfncvt.rtz.xu.f.w v8, v16|0x4b0b1457
+vfncvt.rtz.xu.f.w v8, v16, v0.t|0x490b1457
+vfncvt.rtz.x.f.w v8, v16|0x4b0b9457
+vfncvt.rtz.x.f.w v8, v16, v0.t|0x490b9457
+vfsqrt.v v8, v16|0x4f001457
+vfsqrt.v v8, v16, v0.t|0x4d001457
+vfrsqrt7.v v8, v16|0x4f021457
+vfrsqrt7.v v8, v16, v0.t|0x4d021457
+vfrec7.v v8, v16|0x4f029457
+vfrec7.v v8, v16, v0.t|0x4d029457
+vfclass.v v8, v16|0x4f081457
+vfclass.v v8, v16, v0.t|0x4d081457
+vfwadd.vv v8, v16, v24|0xc30c1457
+vfwadd.vv v8, v16, v24, v0.t|0xc10c1457
+vfwredusum.vs v8, v16, v24|0xc70c1457
+vfwredusum.vs v8, v16, v24, v0.t|0xc50c1457
+vfwsub.vv v8, v16, v24|0xcb0c1457
+vfwsub.vv v8, v16, v24, v0.t|0xc90c1457
+vfwredosum.vs v8, v16, v24|0xcf0c1457
+vfwredosum.vs v8, v16, v24, v0.t|0xcd0c1457
+vfwadd.wv v8, v16, v24|0xd30c1457
+vfwadd.wv v8, v16, v24, v0.t|0xd10c1457
+vfwsub.wv v8, v16, v24|0xdb0c1457
+vfwsub.wv v8, v16, v24, v0.t|0xd90c1457
+vfwmul.vv v8, v16, v24|0xe30c1457
+vfwmul.vv v8, v16, v24, v0.t|0xe10c1457
+vfwmacc.vv v8, v24, v16|0xf30c1457
+vfwmacc.vv v8, v24, v16, v0.t|0xf10c1457
+vfwnmacc.vv v8, v24, v16|0xf70c1457
+vfwnmacc.vv v8, v24, v16, v0.t|0xf50c1457
+vfwmsac.vv v8, v24, v16|0xfb0c1457
+vfwmsac.vv v8, v24, v16, v0.t|0xf90c1457
+vfwnmsac.vv v8, v24, v16|0xff0c1457
+vfwnmsac.vv v8, v24, v16, v0.t|0xfd0c1457
+vadd.vx v8, v16, a1|0x0305c457
+vadd.vx v8, v16, a1, v0.t|0x0105c457
+vsub.vx v8, v16, a1|0x0b05c457
+vsub.vx v8, v16, a1, v0.t|0x0905c457
+vrsub.vx v8, v16, a1|0x0f05c457
+vrsub.vx v8, v16, a1, v0.t|0x0d05c457
+vminu.vx v8, v16, a1|0x1305c457
+vminu.vx v8, v16, a1, v0.t|0x1105c457
+vmin.vx v8, v16, a1|0x1705c457
+vmin.vx v8, v16, a1, v0.t|0x1505c457
+vmaxu.vx v8, v16, a1|0x1b05c457
+vmaxu.vx v8, v16, a1, v0.t|0x1905c457
+vmax.vx v8, v16, a1|0x1f05c457
+vmax.vx v8, v16, a1, v0.t|0x1d05c457
+vand.vx v8, v16, a1|0x2705c457
+vand.vx v8, v16, a1, v0.t|0x2505c457
+vor.vx v8, v16, a1|0x2b05c457
+vor.vx v8, v16, a1, v0.t|0x2905c457
+vxor.vx v8, v16, a1|0x2f05c457
+vxor.vx v8, v16, a1, v0.t|0x2d05c457
+vrgather.vx v8, v16, a1|0x3305c457
+vrgather.vx v8, v16, a1, v0.t|0x3105c457
+vslideup.vx v8, v16, a1|0x3b05c457
+vslideup.vx v8, v16, a1, v0.t|0x3905c457
+vslidedown.vx v8, v16, a1|0x3f05c457
+vslidedown.vx v8, v16, a1, v0.t|0x3d05c457
+vadc.vxm v8, v16, a1, v0|0x4105c457
+vmadc.vxm v8, v16, a1, v0|0x4505c457
+vmadc.vx v8, v16, a1|0x4705c457
+vsbc.vxm v8, v16, a1, v0|0x4905c457
+vmsbc.vxm v8, v16, a1, v0|0x4d05c457
+vmsbc.vx v8, v16, a1|0x4f05c457
+vmerge.vxm v8, v16, a1, v0|0x5d05c457
+vmv.v.x v8, a1|0x5e05c457
+vmseq.vx v8, v16, a1|0x6305c457
+vmseq.vx v8, v16, a1, v0.t|0x6105c457
+vmsne.vx v8, v16, a1|0x6705c457
+vmsne.vx v8, v16, a1, v0.t|0x6505c457
+vmsltu.vx v8, v16, a1|0x6b05c457
+vmsltu.vx v8, v16, a1, v0.t|0x6905c457
+vmslt.vx v8, v16, a1|0x6f05c457
+vmslt.vx v8, v16, a1, v0.t|0x6d05c457
+vmsleu.vx v8, v16, a1|0x7305c457
+vmsleu.vx v8, v16, a1, v0.t|0x7105c457
+vmsle.vx v8, v16, a1|0x7705c457
+vmsle.vx v8, v16, a1, v0.t|0x7505c457
+vmsgtu.vx v8, v16, a1|0x7b05c457
+vmsgtu.vx v8, v16, a1, v0.t|0x7905c457
+vmsgt.vx v8, v16, a1|0x7f05c457
+vmsgt.vx v8, v16, a1, v0.t|0x7d05c457
+vsaddu.vx v8, v16, a1|0x8305c457
+vsaddu.vx v8, v16, a1, v0.t|0x8105c457
+vsadd.vx v8, v16, a1|0x8705c457
+vsadd.vx v8, v16, a1, v0.t|0x8505c457
+vssubu.vx v8, v16, a1|0x8b05c457
+vssubu.vx v8, v16, a1, v0.t|0x8905c457
+vssub.vx v8, v16, a1|0x8f05c457
+vssub.vx v8, v16, a1, v0.t|0x8d05c457
+vsll.vx v8, v16, a1|0x9705c457
+vsll.vx v8, v16, a1, v0.t|0x9505c457
+vsmul.vx v8, v16, a1|0x9f05c457
+vsmul.vx v8, v16, a1, v0.t|0x9d05c457
+vsrl.vx v8, v16, a1|0xa305c457
+vsrl.vx v8, v16, a1, v0.t|0xa105c457
+vsra.vx v8, v16, a1|0xa705c457
+vsra.vx v8, v16, a1, v0.t|0xa505c457
+vssrl.vx v8, v16, a1|0xab05c457
+vssrl.vx v8, v16, a1, v0.t|0xa905c457
+vssra.vx v8, v16, a1|0xaf05c457
+vssra.vx v8, v16, a1, v0.t|0xad05c457
+vnsrl.wx v8, v16, a1|0xb305c457
+vnsrl.wx v8, v16, a1, v0.t|0xb105c457
+vnsra.wx v8, v16, a1|0xb705c457
+vnsra.wx v8, v16, a1, v0.t|0xb505c457
+vnclipu.wx v8, v16, a1|0xbb05c457
+vnclipu.wx v8, v16, a1, v0.t|0xb905c457
+vnclip.wx v8, v16, a1|0xbf05c457
+vnclip.wx v8, v16, a1, v0.t|0xbd05c457
+vadd.vv v8, v16, v24|0x030c0457
+vadd.vv v8, v16, v24, v0.t|0x010c0457
+vsub.vv v8, v16, v24|0x0b0c0457
+vsub.vv v8, v16, v24, v0.t|0x090c0457
+vminu.vv v8, v16, v24|0x130c0457
+vminu.vv v8, v16, v24, v0.t|0x110c0457
+vmin.vv v8, v16, v24|0x170c0457
+vmin.vv v8, v16, v24, v0.t|0x150c0457
+vmaxu.vv v8, v16, v24|0x1b0c0457
+vmaxu.vv v8, v16, v24, v0.t|0x190c0457
+vmax.vv v8, v16, v24|0x1f0c0457
+vmax.vv v8, v16, v24, v0.t|0x1d0c0457
+vand.vv v8, v16, v24|0x270c0457
+vand.vv v8, v16, v24, v0.t|0x250c0457
+vor.vv v8, v16, v24|0x2b0c0457
+vor.vv v8, v16, v24, v0.t|0x290c0457
+vxor.vv v8, v16, v24|0x2f0c0457
+vxor.vv v8, v16, v24, v0.t|0x2d0c0457
+vrgather.vv v8, v16, v24|0x330c0457
+vrgather.vv v8, v16, v24, v0.t|0x310c0457
+vrgatherei16.vv v8, v16, v24|0x3b0c0457
+vrgatherei16.vv v8, v16, v24, v0.t|0x390c0457
+vadc.vvm v8, v16, v24, v0|0x410c0457
+vmadc.vvm v8, v16, v24, v0|0x450c0457
+vmadc.vv v8, v16, v24|0x470c0457
+vsbc.vvm v8, v16, v24, v0|0x490c0457
+vmsbc.vvm v8, v16, v24, v0|0x4d0c0457
+vmsbc.vv v8, v16, v24|0x4f0c0457
+vmerge.vvm v8, v16, v24, v0|0x5d0c0457
+vmv.v.v v8, v24|0x5e0c0457
+vmseq.vv v8, v16, v24|0x630c0457
+vmseq.vv v8, v16, v24, v0.t|0x610c0457
+vmsne.vv v8, v16, v24|0x670c0457
+vmsne.vv v8, v16, v24, v0.t|0x650c0457
+vmsltu.vv v8, v16, v24|0x6b0c0457
+vmsltu.vv v8, v16, v24, v0.t|0x690c0457
+vmslt.vv v8, v16, v24|0x6f0c0457
+vmslt.vv v8, v16, v24, v0.t|0x6d0c0457
+vmsleu.vv v8, v16, v24|0x730c0457
+vmsleu.vv v8, v16, v24, v0.t|0x710c0457
+vmsle.vv v8, v16, v24|0x770c0457
+vmsle.vv v8, v16, v24, v0.t|0x750c0457
+vsaddu.vv v8, v16, v24|0x830c0457
+vsaddu.vv v8, v16, v24, v0.t|0x810c0457
+vsadd.vv v8, v16, v24|0x870c0457
+vsadd.vv v8, v16, v24, v0.t|0x850c0457
+vssubu.vv v8, v16, v24|0x8b0c0457
+vssubu.vv v8, v16, v24, v0.t|0x890c0457
+vssub.vv v8, v16, v24|0x8f0c0457
+vssub.vv v8, v16, v24, v0.t|0x8d0c0457
+vsll.vv v8, v16, v24|0x970c0457
+vsll.vv v8, v16, v24, v0.t|0x950c0457
+vsmul.vv v8, v16, v24|0x9f0c0457
+vsmul.vv v8, v16, v24, v0.t|0x9d0c0457
+vsrl.vv v8, v16, v24|0xa30c0457
+vsrl.vv v8, v16, v24, v0.t|0xa10c0457
+vsra.vv v8, v16, v24|0xa70c0457
+vsra.vv v8, v16, v24, v0.t|0xa50c0457
+vssrl.vv v8, v16, v24|0xab0c0457
+vssrl.vv v8, v16, v24, v0.t|0xa90c0457
+vssra.vv v8, v16, v24|0xaf0c0457
+vssra.vv v8, v16, v24, v0.t|0xad0c0457
+vnsrl.wv v8, v16, v24|0xb30c0457
+vnsrl.wv v8, v16, v24, v0.t|0xb10c0457
+vnsra.wv v8, v16, v24|0xb70c0457
+vnsra.wv v8, v16, v24, v0.t|0xb50c0457
+vnclipu.wv v8, v16, v24|0xbb0c0457
+vnclipu.wv v8, v16, v24, v0.t|0xb90c0457
+vnclip.wv v8, v16, v24|0xbf0c0457
+vnclip.wv v8, v16, v24, v0.t|0xbd0c0457
+vwredsumu.vs v8, v16, v24|0xc30c0457
+vwredsumu.vs v8, v16, v24, v0.t|0xc10c0457
+vwredsum.vs v8, v16, v24|0xc70c0457
+vwredsum.vs v8, v16, v24, v0.t|0xc50c0457
+vadd.vi v8, v16, -16|0x03083457
+vadd.vi v8, v16, -16, v0.t|0x01083457
+vadd.vi v8, v16, 15|0x0307b457
+vadd.vi v8, v16, 15, v0.t|0x0107b457
+vrsub.vi v8, v16, -16|0x0f083457
+vrsub.vi v8, v16, -16, v0.t|0x0d083457
+vrsub.vi v8, v16, 15|0x0f07b457
+vrsub.vi v8, v16, 15, v0.t|0x0d07b457
+vand.vi v8, v16, -16|0x27083457
+vand.vi v8, v16, -16, v0.t|0x25083457
+vand.vi v8, v16, 15|0x2707b457
+vand.vi v8, v16, 15, v0.t|0x2507b457
+vor.vi v8, v16, -16|0x2b083457
+vor.vi v8, v16, -16, v0.t|0x29083457
+vor.vi v8, v16, 15|0x2b07b457
+vor.vi v8, v16, 15, v0.t|0x2907b457
+vxor.vi v8, v16, -16|0x2f083457
+vxor.vi v8, v16, -16, v0.t|0x2d083457
+vxor.vi v8, v16, 15|0x2f07b457
+vxor.vi v8, v16, 15, v0.t|0x2d07b457
+vrgather.vi v8, v16, 0|0x33003457
+vrgather.vi v8, v16, 0, v0.t|0x31003457
+vrgather.vi v8, v16, 31|0x330fb457
+vrgather.vi v8, v16, 31, v0.t|0x310fb457
+vslideup.vi v8, v16, 0|0x3b003457
+vslideup.vi v8, v16, 0, v0.t|0x39003457
+vslideup.vi v8, v16, 31|0x3b0fb457
+vslideup.vi v8, v16, 31, v0.t|0x390fb457
+vslidedown.vi v8, v16, 0|0x3f003457
+vslidedown.vi v8, v16, 0, v0.t|0x3d003457
+vslidedown.vi v8, v16, 31|0x3f0fb457
+vslidedown.vi v8, v16, 31, v0.t|0x3d0fb457
+vadc.vim v8, v16, -16, v0|0x41083457
+vadc.vim v8, v16, 15, v0|0x4107b457
+vmadc.vim v8, v16, -16, v0|0x45083457
+vmadc.vim v8, v16, 15, v0|0x4507b457
+vmadc.vi v8, v16, -16|0x47083457
+vmadc.vi v8, v16, 15|0x4707b457
+vmerge.vim v8, v16, -16, v0|0x5d083457
+vmerge.vim v8, v16, 15, v0|0x5d07b457
+vmv.v.i v8, -16|0x5e083457
+vmv.v.i v8, 15|0x5e07b457
+vmseq.vi v8, v16, -16|0x63083457
+vmseq.vi v8, v16, -16, v0.t|0x61083457
+vmseq.vi v8, v16, 15|0x6307b457
+vmseq.vi v8, v16, 15, v0.t|0x6107b457
+vmsne.vi v8, v16, -16|0x67083457
+vmsne.vi v8, v16, -16, v0.t|0x65083457
+vmsne.vi v8, v16, 15|0x6707b457
+vmsne.vi v8, v16, 15, v0.t|0x6507b457
+vmsleu.vi v8, v16, -16|0x73083457
+vmsleu.vi v8, v16, -16, v0.t|0x71083457
+vmsleu.vi v8, v16, 15|0x7307b457
+vmsleu.vi v8, v16, 15, v0.t|0x7107b457
+vmsle.vi v8, v16, -16|0x77083457
+vmsle.vi v8, v16, -16, v0.t|0x75083457
+vmsle.vi v8, v16, 15|0x7707b457
+vmsle.vi v8, v16, 15, v0.t|0x7507b457
+vmsgtu.vi v8, v16, -16|0x7b083457
+vmsgtu.vi v8, v16, -16, v0.t|0x79083457
+vmsgtu.vi v8, v16, 15|0x7b07b457
+vmsgtu.vi v8, v16, 15, v0.t|0x7907b457
+vmsgt.vi v8, v16, -16|0x7f083457
+vmsgt.vi v8, v16, -16, v0.t|0x7d083457
+vmsgt.vi v8, v16, 15|0x7f07b457
+vmsgt.vi v8, v16, 15, v0.t|0x7d07b457
+vsaddu.vi v8, v16, -16|0x83083457
+vsaddu.vi v8, v16, -16, v0.t|0x81083457
+vsaddu.vi v8, v16, 15|0x8307b457
+vsaddu.vi v8, v16, 15, v0.t|0x8107b457
+vsadd.vi v8, v16, -16|0x87083457
+vsadd.vi v8, v16, -16, v0.t|0x85083457
+vsadd.vi v8, v16, 15|0x8707b457
+vsadd.vi v8, v16, 15, v0.t|0x8507b457
+vsll.vi v8, v16, 0|0x97003457
+vsll.vi v8, v16, 0, v0.t|0x95003457
+vsll.vi v8, v16, 31|0x970fb457
+vsll.vi v8, v16, 31, v0.t|0x950fb457
+vmv1r.v v8, v16|0x9f003457
+vmv2r.v v8, v16|0x9f00b457
+vmv4r.v v8, v16|0x9f01b457
+vmv8r.v v8, v16|0x9f03b457
+vsrl.vi v8, v16, 0|0xa3003457
+vsrl.vi v8, v16, 0, v0.t|0xa1003457
+vsrl.vi v8, v16, 31|0xa30fb457
+vsrl.vi v8, v16, 31, v0.t|0xa10fb457
+vsra.vi v8, v16, 0|0xa7003457
+vsra.vi v8, v16, 0, v0.t|0xa5003457
+vsra.vi v8, v16, 31|0xa70fb457
+vsra.vi v8, v16, 31, v0.t|0xa50fb457
+vssrl.vi v8, v16, 0|0xab003457
+vssrl.vi v8, v16, 0, v0.t|0xa9003457
+vssrl.vi v8, v16, 31|0xab0fb457
+vssrl.vi v8, v16, 31, v0.t|0xa90fb457
+vssra.vi v8, v16, 0|0xaf003457
+vssra.vi v8, v16, 0, v0.t|0xad003457
+vssra.vi v8, v16, 31|0xaf0fb457
+vssra.vi v8, v16, 31, v0.t|0xad0fb457
+vnsrl.wi v8, v16, 0|0xb3003457
+vnsrl.wi v8, v16, 0, v0.t|0xb1003457
+vnsrl.wi v8, v16, 31|0xb30fb457
+vnsrl.wi v8, v16, 31, v0.t|0xb10fb457
+vnsra.wi v8, v16, 0|0xb7003457
+vnsra.wi v8, v16, 0, v0.t|0xb5003457
+vnsra.wi v8, v16, 31|0xb70fb457
+vnsra.wi v8, v16, 31, v0.t|0xb50fb457
+vnclipu.wi v8, v16, 0|0xbb003457
+vnclipu.wi v8, v16, 0, v0.t|0xb9003457
+vnclipu.wi v8, v16, 31|0xbb0fb457
+vnclipu.wi v8, v16, 31, v0.t|0xb90fb457
+vnclip.wi v8, v16, 0|0xbf003457
+vnclip.wi v8, v16, 0, v0.t|0xbd003457
+vnclip.wi v8, v16, 31|0xbf0fb457
+vnclip.wi v8, v16, 31, v0.t|0xbd0fb457
+vredsum.vs v8, v16, v24|0x030c2457
+vredsum.vs v8, v16, v24, v0.t|0x010c2457
+vredand.vs v8, v16, v24|0x070c2457
+vredand.vs v8, v16, v24, v0.t|0x050c2457
+vredor.vs v8, v16, v24|0x0b0c2457
+vredor.vs v8, v16, v24, v0.t|0x090c2457
+vredxor.vs v8, v16, v24|0x0f0c2457
+vredxor.vs v8, v16, v24, v0.t|0x0d0c2457
+vredminu.vs v8, v16, v24|0x130c2457
+vredminu.vs v8, v16, v24, v0.t|0x110c2457
+vredmin.vs v8, v16, v24|0x170c2457
+vredmin.vs v8, v16, v24, v0.t|0x150c2457
+vredmaxu.vs v8, v16, v24|0x1b0c2457
+vredmaxu.vs v8, v16, v24, v0.t|0x190c2457
+vredmax.vs v8, v16, v24|0x1f0c2457
+vredmax.vs v8, v16, v24, v0.t|0x1d0c2457
+vaaddu.vv v8, v16, v24|0x230c2457
+vaaddu.vv v8, v16, v24, v0.t|0x210c2457
+vaadd.vv v8, v16, v24|0x270c2457
+vaadd.vv v8, v16, v24, v0.t|0x250c2457
+vasubu.vv v8, v16, v24|0x2b0c2457
+vasubu.vv v8, v16, v24, v0.t|0x290c2457
+vasub.vv v8, v16, v24|0x2f0c2457
+vasub.vv v8, v16, v24, v0.t|0x2d0c2457
+vmv.x.s a0, v16|0x43002557
+vzext.vf8 v8, v16|0x4b012457
+vzext.vf8 v8, v16, v0.t|0x49012457
+vsext.vf8 v8, v16|0x4b01a457
+vsext.vf8 v8, v16, v0.t|0x4901a457
+vzext.vf4 v8, v16|0x4b022457
+vzext.vf4 v8, v16, v0.t|0x49022457
+vsext.vf4 v8, v16|0x4b02a457
+vsext.vf4 v8, v16, v0.t|0x4902a457
+vzext.vf2 v8, v16|0x4b032457
+vzext.vf2 v8, v16, v0.t|0x49032457
+vsext.vf2 v8, v16|0x4b03a457
+vsext.vf2 v8, v16, v0.t|0x4903a457
+vcompress.vm v8, v16, v24|0x5f0c2457
+vmandn.mm v8, v16, v24|0x630c2457
+vmand.mm v8, v16, v24|0x670c2457
+vmor.mm v8, v16, v24|0x6b0c2457
+vmxor.mm v8, v16, v24|0x6f0c2457
+vmorn.mm v8, v16, v24|0x730c2457
+vmnand.mm v8, v16, v24|0x770c2457
+vmnor.mm v8, v16, v24|0x7b0c2457
+vmxnor.mm v8, v16, v24|0x7f0c2457
+vmsbf.m v8, v16|0x5300a457
+vmsbf.m v8, v16, v0.t|0x5100a457
+vmsof.m v8, v16|0x53012457
+vmsof.m v8, v16, v0.t|0x51012457
+vmsif.m v8, v16|0x5301a457
+vmsif.m v8, v16, v0.t|0x5101a457
+viota.m v8, v16|0x53082457
+viota.m v8, v16, v0.t|0x51082457
+vid.v v8|0x5208a457
+vid.v v8, v0.t|0x5008a457
+vcpop.m a0, v16|0x43082557
+vcpop.m a0, v16, v0.t|0x41082557
+vfirst.m a0, v16|0x4308a557
+vfirst.m a0, v16, v0.t|0x4108a557
+vdivu.vv v8, v16, v24|0x830c2457
+vdivu.vv v8, v16, v24, v0.t|0x810c2457
+vdiv.vv v8, v16, v24|0x870c2457
+vdiv.vv v8, v16, v24, v0.t|0x850c2457
+vremu.vv v8, v16, v24|0x8b0c2457
+vremu.vv v8, v16, v24, v0.t|0x890c2457
+vrem.vv v8, v16, v24|0x8f0c2457
+vrem.vv v8, v16, v24, v0.t|0x8d0c2457
+vmulhu.vv v8, v16, v24|0x930c2457
+vmulhu.vv v8, v16, v24, v0.t|0x910c2457
+vmul.vv v8, v16, v24|0x970c2457
+vmul.vv v8, v16, v24, v0.t|0x950c2457
+vmulhsu.vv v8, v16, v24|0x9b0c2457
+vmulhsu.vv v8, v16, v24, v0.t|0x990c2457
+vmulh.vv v8, v16, v24|0x9f0c2457
+vmulh.vv v8, v16, v24, v0.t|0x9d0c2457
+vmadd.vv v8, v24, v16|0xa70c2457
+vmadd.vv v8, v24, v16, v0.t|0xa50c2457
+vnmsub.vv v8, v24, v16|0xaf0c2457
+vnmsub.vv v8, v24, v16, v0.t|0xad0c2457
+vmacc.vv v8, v24, v16|0xb70c2457
+vmacc.vv v8, v24, v16, v0.t|0xb50c2457
+vnmsac.vv v8, v24, v16|0xbf0c2457
+vnmsac.vv v8, v24, v16, v0.t|0xbd0c2457
+vwaddu.vv v8, v16, v24|0xc30c2457
+vwaddu.vv v8, v16, v24, v0.t|0xc10c2457
+vwadd.vv v8, v16, v24|0xc70c2457
+vwadd.vv v8, v16, v24, v0.t|0xc50c2457
+vwsubu.vv v8, v16, v24|0xcb0c2457
+vwsubu.vv v8, v16, v24, v0.t|0xc90c2457
+vwsub.vv v8, v16, v24|0xcf0c2457
+vwsub.vv v8, v16, v24, v0.t|0xcd0c2457
+vwaddu.wv v8, v16, v24|0xd30c2457
+vwaddu.wv v8, v16, v24, v0.t|0xd10c2457
+vwadd.wv v8, v16, v24|0xd70c2457
+vwadd.wv v8, v16, v24, v0.t|0xd50c2457
+vwsubu.wv v8, v16, v24|0xdb0c2457
+vwsubu.wv v8, v16, v24, v0.t|0xd90c2457
+vwsub.wv v8, v16, v24|0xdf0c2457
+vwsub.wv v8, v16, v24, v0.t|0xdd0c2457
+vwmulu.vv v8, v16, v24|0xe30c2457
+vwmulu.vv v8, v16, v24, v0.t|0xe10c2457
+vwmulsu.vv v8, v16, v24|0xeb0c2457
+vwmulsu.vv v8, v16, v24, v0.t|0xe90c2457
+vwmul.vv v8, v16, v24|0xef0c2457
+vwmul.vv v8, v16, v24, v0.t|0xed0c2457
+vwmaccu.vv v8, v24, v16|0xf30c2457
+vwmaccu.vv v8, v24, v16, v0.t|0xf10c2457
+vwmacc.vv v8, v24, v16|0xf70c2457
+vwmacc.vv v8, v24, v16, v0.t|0xf50c2457
+vwmaccsu.vv v8, v24, v16|0xff0c2457
+vwmaccsu.vv v8, v24, v16, v0.t|0xfd0c2457
+vaaddu.vx v8, v16, a1|0x2305e457
+vaaddu.vx v8, v16, a1, v0.t|0x2105e457
+vaadd.vx v8, v16, a1|0x2705e457
+vaadd.vx v8, v16, a1, v0.t|0x2505e457
+vasubu.vx v8, v16, a1|0x2b05e457
+vasubu.vx v8, v16, a1, v0.t|0x2905e457
+vasub.vx v8, v16, a1|0x2f05e457
+vasub.vx v8, v16, a1, v0.t|0x2d05e457
+vmv.s.x v8, a1|0x4205e457
+vslide1up.vx v8, v16, a1|0x3b05e457
+vslide1up.vx v8, v16, a1, v0.t|0x3905e457
+vslide1down.vx v8, v16, a1|0x3f05e457
+vslide1down.vx v8, v16, a1, v0.t|0x3d05e457
+vdivu.vx v8, v16, a1|0x8305e457
+vdivu.vx v8, v16, a1, v0.t|0x8105e457
+vdiv.vx v8, v16, a1|0x8705e457
+vdiv.vx v8, v16, a1, v0.t|0x8505e457
+vremu.vx v8, v16, a1|0x8b05e457
+vremu.vx v8, v16, a1, v0.t|0x8905e457
+vrem.vx v8, v16, a1|0x8f05e457
+vrem.vx v8, v16, a1, v0.t|0x8d05e457
+vmulhu.vx v8, v16, a1|0x9305e457
+vmulhu.vx v8, v16, a1, v0.t|0x9105e457
+vmul.vx v8, v16, a1|0x9705e457
+vmul.vx v8, v16, a1, v0.t|0x9505e457
+vmulhsu.vx v8, v16, a1|0x9b05e457
+vmulhsu.vx v8, v16, a1, v0.t|0x9905e457
+vmulh.vx v8, v16, a1|0x9f05e457
+vmulh.vx v8, v16, a1, v0.t|0x9d05e457
+vmadd.vx v8, a1, v16|0xa705e457
+vmadd.vx v8, a1, v16, v0.t|0xa505e457
+vnmsub.vx v8, a1, v16|0xaf05e457
+vnmsub.vx v8, a1, v16, v0.t|0xad05e457
+vmacc.vx v8, a1, v16|0xb705e457
+vmacc.vx v8, a1, v16, v0.t|0xb505e457
+vnmsac.vx v8, a1, v16|0xbf05e457
+vnmsac.vx v8, a1, v16, v0.t|0xbd05e457
+vwaddu.vx v8, v16, a1|0xc305e457
+vwaddu.vx v8, v16, a1, v0.t|0xc105e457
+vwadd.vx v8, v16, a1|0xc705e457
+vwadd.vx v8, v16, a1, v0.t|0xc505e457
+vwsubu.vx v8, v16, a1|0xcb05e457
+vwsubu.vx v8, v16, a1, v0.t|0xc905e457
+vwsub.vx v8, v16, a1|0xcf05e457
+vwsub.vx v8, v16, a1, v0.t|0xcd05e457
+vwaddu.wx v8, v16, a1|0xd305e457
+vwaddu.wx v8, v16, a1, v0.t|0xd105e457
+vwadd.wx v8, v16, a1|0xd705e457
+vwadd.wx v8, v16, a1, v0.t|0xd505e457
+vwsubu.wx v8, v16, a1|0xdb05e457
+vwsubu.wx v8, v16, a1, v0.t|0xd905e457
+vwsub.wx v8, v16, a1|0xdf05e457
+vwsub.wx v8, v16, a1, v0.t|0xdd05e457
+vwmulu.vx v8, v16, a1|0xe305e457
+vwmulu.vx v8, v16, a1, v0.t|0xe105e457
+vwmulsu.vx v8, v16, a1|0xeb05e457
+vwmulsu.vx v8, v16, a1, v0.t|0xe905e457
+vwmul.vx v8, v16, a1|0xef05e457
+vwmul.vx v8, v16, a1, v0.t|0xed05e457
+vwmaccu.vx v8, a1, v16|0xf305e457
+vwmaccu.vx v8, a1, v16, v0.t|0xf105e457
+vwmacc.vx v8, a1, v16|0xf705e457
+vwmacc.vx v8, a1, v16, v0.t|0xf505e457
+vwmaccus.vx v8, a1, v16|0xfb05e457
+vwmaccus.vx v8, a1, v16, v0.t|0xf905e457
+vwmaccsu.vx v8, a1, v16|0xff05e457
+vwmaccsu.vx v8, a1, v16, v0.t|0xfd05e457
