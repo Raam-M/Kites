@@ -7,6 +7,7 @@
 /** @endcond */
 
 #include "common/instructions.h"
+#include "processor/vector/vector_isa.h"
 
 #include <string>
 #include <unordered_map>
@@ -357,6 +358,7 @@ static const std::unordered_set<std::string> valid_instructions = {
     "beq", "bne", "blt", "bge", "bltu", "bgeu", "lui", "auipc", "jal", "jalr", "ecall", "ebreak",
 
     "csrrw", "csrrs", "csrrc", "csrrwi", "csrrsi", "csrrci",
+    "csrr", "csrw", "csrs", "csrc", "csrwi", "csrsi", "csrci",
 
     "la", "nop", "li", "mv", "not", "neg", "negw", "sext.w", "seqz", "snez", "sltz", "sgtz", "beqz",
     "bnez", "blez", "bgez", "bltz", "bgtz", "bgt", "ble", "bgtu", "bleu", "j", "jr", "ret", "call",
@@ -971,7 +973,15 @@ std::unordered_map<std::string, std::vector<SyntaxType>> instruction_syntax_map 
 
 bool isValidInstruction(const std::string &instruction)
 {
-    return valid_instructions.find(instruction) != valid_instructions.end();
+    return valid_instructions.find(instruction) != valid_instructions.end() ||
+           rvv::isVectorMnemonic(instruction) || rvv::isVectorPseudo(instruction);
+}
+
+bool isCsrPseudoInstruction(const std::string &instruction)
+{
+    static const std::unordered_set<std::string> names = {"csrr",  "csrw",  "csrs", "csrc",
+                                                          "csrwi", "csrsi", "csrci"};
+    return names.count(instruction) != 0;
 }
 
 bool isValidRTypeInstruction(const std::string &instruction)
@@ -1153,6 +1163,22 @@ bool isDInstruction(const uint32_t &instruction)
 
 std::string getExpectedSyntaxes(const std::string &opcode)
 {
+    if (const rvv::InsnInfo *vectorInfo = rvv::findByMnemonic(opcode))
+    {
+        return rvv::expectedSyntax(*vectorInfo);
+    }
+    if (rvv::isVectorPseudo(opcode))
+    {
+        return rvv::pseudoSyntax(opcode);
+    }
+    if (isCsrPseudoInstruction(opcode))
+    {
+        if (opcode == "csrr")
+            return "csrr <reg>, <csr>";
+        if (opcode.back() == 'i')
+            return opcode + " <csr>, <uimm5>";
+        return opcode + " <csr>, <reg>";
+    }
     static const std::unordered_map<std::string, std::string> opcodeSyntaxMap = {
         {"nop", "nop"},
         {"li", "li <reg>, <imm>"},
@@ -1228,6 +1254,8 @@ std::string getExpectedSyntaxes(const std::string &opcode)
 
 InstructionType getInstructionType(const std::string &instruction)
 {
+    if (rvv::isVectorMnemonic(instruction) || rvv::isVectorPseudo(instruction))
+        return InstructionType::V_TYPE;
     // Check each instruction type
     if (isValidRTypeInstruction(instruction))
         return InstructionType::R_TYPE;
@@ -1279,6 +1307,8 @@ std::string disassemble(uint32_t instruction)
 {
     if (instruction == 0 || instruction == 0x13)
         return "nop";
+    if (rvv::isVectorInstruction(instruction))
+        return rvv::disassemble(instruction);
 
     uint8_t opcode = instruction & 0x7F;
     uint8_t rd = (instruction >> 7) & 0x1F;

@@ -60,6 +60,10 @@ std::string tokenTypeToString(TokenType type)
         return "STRING      ";
     case TokenType::RM:
         return "RM          ";
+    case TokenType::VEC_MASK:
+        return "VEC_MASK    ";
+    case TokenType::VTYPE_FIELD:
+        return "VTYPE_FIELD ";
     default:
         return "UNKNOWN     ";
     }

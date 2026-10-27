@@ -9,6 +9,7 @@
 #include "common/instructions.h"
 #include "common/rounding_modes.h"
 #include "processor/registers.h"
+#include "processor/vector/vtype.h"
 
 
 #include <fstream>
@@ -137,6 +138,31 @@ Token Lexer::identifier()
     if (IsValidCsr(value))
     {
         return {TokenType::CSR_REGISTER, value, line_number_, start_column};
+    }
+    if (IsValidVectorRegister(value))
+    {
+        return {TokenType::VEC_REGISTER, value, line_number_, start_column};
+    }
+    if (value == "v0.t")
+    {
+        return {TokenType::VEC_MASK, value, line_number_, start_column};
+    }
+    // vtype keywords (e32, m1, ta, ...) only exist as operands of vsetvli/vsetivli, so labels
+    // with those names keep working everywhere else.
+    if (rvv::isVtypeKeyword(value))
+    {
+        for (auto it = tokens_.rbegin(); it != tokens_.rend() && it->line_number == line_number_;
+             ++it)
+        {
+            if (it->type == TokenType::OPCODE)
+            {
+                if (it->value == "vsetvli" || it->value == "vsetivli")
+                {
+                    return {TokenType::VTYPE_FIELD, value, line_number_, start_column};
+                }
+                break;
+            }
+        }
     }
 
     if (isValidRoundingMode(value))

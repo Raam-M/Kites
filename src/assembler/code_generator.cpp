@@ -366,7 +366,11 @@ generateMachineCode(const std::vector<std::pair<ICUnit, bool>> &IntermediateCode
     {
         const ICUnit &block = pair.first;
         uint32_t code;
-        if (instruction_set::isValidRTypeInstruction(block.getOpcode()))
+        if (block.hasMachineCode())
+        {
+            code = block.getMachineCode();
+        }
+        else if (instruction_set::isValidRTypeInstruction(block.getOpcode()))
         {
             code = generateRTypeMachineCode(block);
         }

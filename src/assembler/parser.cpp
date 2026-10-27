@@ -10,6 +10,7 @@
 #include "common/instructions.h"
 #include "utils/utils.h"
 #include "processor/registers.h"
+#include "processor/vector/vector_isa.h"
 
 
 #include <cstdint>
@@ -330,10 +331,24 @@ void Parser::parseTextDirective()
         }
         else if (currentToken().type == TokenType::OPCODE)
         {
-            std::vector<instruction_set::SyntaxType> syntaxes =
-                instruction_set::instruction_syntax_map[currentToken().value];
-
+            std::vector<instruction_set::SyntaxType> syntaxes;
             bool valid_syntax = false;
+            if (rvv::isVectorMnemonic(currentToken().value))
+            {
+                valid_syntax = parse_vector();
+            }
+            else if (rvv::isVectorPseudo(currentToken().value))
+            {
+                valid_syntax = parse_vector_pseudo();
+            }
+            else if (instruction_set::isCsrPseudoInstruction(currentToken().value))
+            {
+                valid_syntax = parse_csr_pseudo();
+            }
+            else
+            {
+                syntaxes = instruction_set::instruction_syntax_map[currentToken().value];
+            }
 
             for (instruction_set::SyntaxType &syntax : syntaxes)
             {

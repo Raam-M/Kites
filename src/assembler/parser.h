@@ -12,6 +12,8 @@
 #include "errors.h"
 #include "tokens.h"
 
+#include "processor/vector/vector_isa.h"
+
 
 #include <map>
 #include <string>
@@ -155,6 +157,29 @@ class Parser
     bool parse_O_GPR_C_FPR_C_RM();
     bool parse_O_GPR_C_FPR_C_FPR();
     bool parse_O_FPR_C_I_LP_GPR_RP();
+
+    /// Parses any RVV instruction using the operand pattern from the vector ISA table.
+    bool parse_vector();
+    /// Parses csrr/csrw/csrs/csrc/csrwi/csrsi/csrci.
+    bool parse_csr_pseudo();
+
+    /// Operand tokens of the current line, split at commas.
+    std::vector<std::vector<Token>> operandGroups();
+    /// Appends an already-encoded instruction for the current line.
+    void emitEncoded(const std::string &mnemonic, uint32_t word);
+    /// Expands a standard vector pseudo-instruction (vneg.v, vmsge.vx, ...).
+    bool parse_vector_pseudo();
+
+    enum class VectorEncodeResult
+    {
+        Ok,
+        SyntaxError, ///< operands do not match; the caller reports the expected syntax
+        Reported,    ///< a specific error was recorded already
+    };
+    /// Encodes one vector instruction from operand token groups.
+    VectorEncodeResult encodeVector(const rvv::InsnInfo &info,
+                                    const std::vector<std::vector<Token>> &groups, uint32_t &word);
+    void reportImmediateRange(const Token &token, int64_t min, int64_t max);
 
     /**
      * @brief Parses a data directive.

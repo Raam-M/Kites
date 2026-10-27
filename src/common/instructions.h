@@ -497,6 +497,9 @@ bool isValidJTypeInstruction(const std::string &instruction);
 
 bool isValidPseudoInstruction(const std::string &instruction);
 
+/// csrr, csrw, csrs, csrc, csrwi, csrsi, csrci
+bool isCsrPseudoInstruction(const std::string &instruction);
+
 bool isValidBaseExtensionInstruction(const std::string &instruction);
 
 bool isValidCSRRTypeInstruction(const std::string &instruction);

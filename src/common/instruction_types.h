@@ -28,6 +28,7 @@ enum class InstructionType
     U_TYPE,
     J_TYPE,
     F_TYPE,
+    V_TYPE,
     INSTRUCTION_TYPE_COUNT, // this is used to get the count of valid instruction types
     UNKNOWN // putting unknown in the last becase we only want the
            //count of valid instruction types
@@ -42,7 +43,8 @@ instructionTypeNames =
     "B-Type", 
     "U-Type", 
     "J-Type", 
-    "F-Type"
+    "F-Type",
+    "V-Type"
 };
 }// namespace instruction_set
 }// namespace Kites

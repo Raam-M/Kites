@@ -41,6 +41,8 @@ struct ICUnit
     std::array<char, 33> imm; ///< Immediate value (up to 32 characters, null-terminated).
     std::string label;        ///< Label associated with this code block, if any.
     uint8_t rm;               ///< Rounding mode (up to 4 characters, null-terminated).
+    uint32_t machine_code = 0;      ///< Pre-encoded instruction word (vector instructions).
+    bool has_machine_code = false;  ///< True if machine_code is set and should be used as is.
 
     ICUnit() : line_number{}, opcode{}, rd{}, rs1{}, rs2{}, rs3{}, csr{}, imm{}, label{}, rm{}
     {
@@ -167,6 +169,23 @@ struct ICUnit
     void setRm(uint8_t value)
     {
         rm = value;
+    }
+
+    /// Stores an instruction word encoded during parsing (used for vector instructions).
+    void setMachineCode(uint32_t value)
+    {
+        machine_code = value;
+        has_machine_code = true;
+    }
+
+    [[nodiscard]] bool hasMachineCode() const
+    {
+        return has_machine_code;
+    }
+
+    [[nodiscard]] uint32_t getMachineCode() const
+    {
+        return machine_code;
     }
 
     [[nodiscard]] unsigned int getLineNumber() const

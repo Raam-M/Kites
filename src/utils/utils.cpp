@@ -6,6 +6,7 @@
 
 #include "utils.h"
 #include "common/globals.h"
+#include "common/instructions.h"
 #include "processor/registers.h"
 
 
@@ -271,6 +272,28 @@ void DumpRegisters(const std::filesystem::path &filename, RegisterFile &register
         }
         file << "\n";
     }
+    file << "    },\n";
+
+    // Vector registers as hex strings, most significant byte first, so element 0 is in the
+    // rightmost (least significant) digits.
+    const std::vector<uint8_t> &vector_bytes = register_file.GetVrBytes();
+    const size_t vlenb = register_file.GetVlenb();
+    file << "    \"vector_registers\": {\n";
+    for (size_t reg = 0; reg < 32 && vlenb > 0; ++reg)
+    {
+        file << "        \"v" << reg << "\"" << std::string((reg >= 10 ? 0 : 1), ' ') << ": \"0x";
+        for (size_t b = vlenb; b-- > 0;)
+        {
+            file << std::hex << std::setw(2) << std::setfill('0')
+                 << static_cast<unsigned>(vector_bytes[reg * vlenb + b]);
+        }
+        file << std::setw(0) << std::setfill(' ') << std::dec << "\"";
+        if (reg != 31)
+        {
+            file << ",";
+        }
+        file << "\n";
+    }
     file << "    }\n";
     // file << "    },\n";
 
@@ -429,7 +452,15 @@ void DumpDisasssembly(const std::filesystem::path &filename, AssembledProgram &p
             out << " ????????             ";
         }
 
-        out << ICBlock << std::endl;
+        if (ICBlock.hasMachineCode())
+        {
+            // Encoded during parsing (vector instructions): print the decoded operands.
+            out << instruction_set::disassemble(ICBlock.getMachineCode()) << std::endl;
+        }
+        else
+        {
+            out << ICBlock << std::endl;
+        }
         instruction_number_disassembly_mapping[instruction_index] = line_number;
 
         ++line_number;

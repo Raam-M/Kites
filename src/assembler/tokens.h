@@ -36,6 +36,8 @@ enum class TokenType
     RPAREN,       ///< Right parenthesis ')'
     STRING,       ///< String literal
     RM,           ///< Rounding mode
+    VEC_MASK,     ///< Vector mask operand "v0.t"
+    VTYPE_FIELD,  ///< vtype keyword in vsetvli/vsetivli (e32, m1, ta, ma, ...)
 };
 
 /**
