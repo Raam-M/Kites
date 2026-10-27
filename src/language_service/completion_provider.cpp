@@ -68,6 +68,8 @@ void CompletionProvider::loadRegisters()
         registers << name;
     for (const char *alias : register_names::kFprAliases)
         registers << alias;
+    for (const char *name : register_names::kVrNames)
+        registers << name;
     m_registers = registers;
 }
 

@@ -81,9 +81,11 @@ void RegisterContainer::setupRegisterTable()
         int firstRow;
         int lastRowExclusive;
     };
-    const std::array<SectionSpec, 2> sections = {
+    const std::array<SectionSpec, 4> sections = {
         SectionSpec{"General Purpose", 0, 32},
-        SectionSpec{"Floating Point", 32, 64},
+        SectionSpec{"Floating Point", 32, RegisterModel::kFirstVectorRow},
+        SectionSpec{"Vector", RegisterModel::kFirstVectorRow, RegisterModel::kFirstVectorCsrRow},
+        SectionSpec{"Vector CSRs", RegisterModel::kFirstVectorCsrRow, RegisterModel::kRowCount},
     };
 
     for (const SectionSpec &spec : sections)

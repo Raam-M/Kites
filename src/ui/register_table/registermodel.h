@@ -16,6 +16,12 @@ class RegisterModel : public QAbstractTableModel
 {
     Q_OBJECT
   public:
+    /// Row layout: x0-x31, f0-f31, v0-v31, then the vector CSRs.
+    static constexpr int kFirstVectorRow = 64;
+    static constexpr int kFirstVectorCsrRow = 96;
+    static constexpr int kVectorCsrCount = 7;
+    static constexpr int kRowCount = kFirstVectorCsrRow + kVectorCsrCount;
+
     explicit RegisterModel(QObject *parent = nullptr, RegisterFile *regfile = nullptr);
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     int columnCount(const QModelIndex &parent = QModelIndex()) const override;
@@ -34,6 +40,8 @@ class RegisterModel : public QAbstractTableModel
     void updateRegisterValue(size_t regIndex, uint64_t value);
     void registerResetSlot();
     void updateFRegisterValue(size_t regIndex, uint64_t value);
+    void updateVRegisterValue(size_t regIndex);
+    void updateCsrValue(size_t address, uint64_t value);
 };
 
 } // namespace Kites

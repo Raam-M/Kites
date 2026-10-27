@@ -310,6 +310,7 @@ bool ThemeManager::parseThemeFile(const QString &path, ThemeData &themeOut, QStr
     setSyntax(SyntaxStyle::FInstruction, "fInstruction", QColor("#c586c0"), true);
     setSyntax(SyntaxStyle::DInstruction, "dInstruction", QColor("#dcdcaa"), true);
     setSyntax(SyntaxStyle::PseudoInstruction, "pseudoInstruction", QColor("#ff8c00"));
+    setSyntax(SyntaxStyle::VInstruction, "vInstruction", QColor("#4ec9b0"), true);
     setSyntax(SyntaxStyle::Register, "register", QColor("#9cdcfe"));
     setSyntax(SyntaxStyle::Comment, "comment", QColor("#6a9955"));
     setSyntax(SyntaxStyle::Label, "label", QColor("#d7ba7d"));

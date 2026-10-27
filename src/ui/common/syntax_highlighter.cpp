@@ -100,6 +100,7 @@ void SyntaxHighlighter::setRegisterHighlightingRules()
         "\\b(?:"
         "x(?:[0-9]|[12][0-9]|3[01])|"
         "f(?:[0-9]|[12][0-9]|3[01])|"
+        "v(?:[0-9]|[12][0-9]|3[01])|"
         "zero|ra|sp|gp|tp|"
         "t[0-6]|"
         "s(?:[0-9]|1[01])|"

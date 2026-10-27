@@ -24,6 +24,7 @@ X(MInstruction, "MInstruction")\
 X(FInstruction, "FInstruction")\
 X(DInstruction, "DInstruction")\
 X(PseudoInstruction, "PseudoInstruction")\
+X(VInstruction, "VInstruction")\
 
 enum class SyntaxStyle
 {

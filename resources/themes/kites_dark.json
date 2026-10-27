@@ -21,6 +21,7 @@
             "fInstruction": "#c586c0",
             "dInstruction": "#dcdcaa",
             "pseudoInstruction": "#ff8c00",
+            "vInstruction": "#4ec9b0",
             "register": "#9cdcfe",
             "comment": "#6a9955",
             "label": "#d7ba7d",
