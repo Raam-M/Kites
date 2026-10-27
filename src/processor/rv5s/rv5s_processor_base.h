@@ -95,6 +95,19 @@ class RV5StageVM_Base : public ProcessorBase
 
     void execute_csr() {};
 
+    // LUI/AUIPC immediate (the 20-bit U field from ImmGenerator) shifted into place and
+    // sign-extended from bit 31, as RV64 requires.
+    static uint64_t upper_immediate(int64_t imm)
+    {
+        return static_cast<uint64_t>(
+            static_cast<int64_t>(static_cast<int32_t>(static_cast<uint32_t>(imm) << 12)));
+    }
+
+    // Integer source (rs1) of an F/D instruction that reads a GPR in EX: load/store base,
+    // fmv.w.x/fmv.d.x and integer-to-float conversions. Forwarding models take it from EX/MEM
+    // when the instruction just ahead produced it; otherwise the register file is current.
+    uint64_t forwarded_fp_gpr_source(unsigned reg) const;
+
     void pipeline_memory();
     void pipeline_writeback();
     void pipeline_writeback_float();

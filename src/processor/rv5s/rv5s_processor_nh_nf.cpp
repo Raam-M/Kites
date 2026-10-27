@@ -239,7 +239,11 @@ void RV5StageProcessorNHNF::pipeline_execute()
     }
     if ((id_ex_reg_.instruction & 0b1111111) == 0b0110111) // lui
     {
-        alu_result = static_cast<uint64_t>(id_ex_reg_.imm << 12);
+        alu_result = upper_immediate(id_ex_reg_.imm);
+    }
+    if ((id_ex_reg_.instruction & 0b1111111) == 0b0010111) // auipc
+    {
+        alu_result = id_ex_reg_.pc + upper_immediate(id_ex_reg_.imm);
     }
 
     // Latch data for EX/MEM Register

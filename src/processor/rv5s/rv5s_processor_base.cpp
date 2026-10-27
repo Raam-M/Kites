@@ -17,8 +17,12 @@ void RV5StageVM_Base::Run()
         }
 
         // if we hit a break point (and it's a new PC), we pause execution
-        // This prevents firing the same breakpoint multiple times during stalls
-        if (std::find(breakpoints_.begin(), breakpoints_.end(), program_counter_) !=
+        // This prevents firing the same breakpoint multiple times during stalls.
+        // While the pipeline drains, the PC is past the program, where LoadProgram always
+        // places a breakpoint; pausing there would stop the run before the last instructions
+        // complete (and hang the batch CLI).
+        if (program_counter_ < program_size_ &&
+            std::find(breakpoints_.begin(), breakpoints_.end(), program_counter_) !=
                 breakpoints_.end() && program_counter_ != last_breakpoint_pc_)
         {
             pause_requested_ = true;
@@ -656,6 +660,48 @@ void RV5StageVM_Base::pipeline_writeback()
             break;
         }
     }
+}
+
+namespace
+{
+/// True if the instruction's register result goes to a GPR (F/D compares, conversions to
+/// integer, fmv.x.*, fclass write a GPR; other F/D instructions write an FPR).
+bool result_is_gpr(uint32_t instruction)
+{
+    if (!instruction_set::isFInstruction(instruction) &&
+        !instruction_set::isDInstruction(instruction))
+    {
+        return true;
+    }
+    if ((instruction & 0b1111111) != 0b1010011)
+    {
+        return false;
+    }
+    switch ((instruction >> 25) & 0b1111111)
+    {
+    case 0b1010000: // feq/flt/fle.s
+    case 0b1010001: // feq/flt/fle.d
+    case 0b1100000: // fcvt.w/wu/l/lu.s
+    case 0b1100001: // fcvt.w/wu/l/lu.d
+    case 0b1110000: // fmv.x.w, fclass.s
+    case 0b1110001: // fmv.x.d, fclass.d
+        return true;
+    default:
+        return false;
+    }
+}
+} // namespace
+
+uint64_t RV5StageVM_Base::forwarded_fp_gpr_source(unsigned reg) const
+{
+    // WB runs before EX in a step, so only the instruction one ahead (in EX/MEM) can hold a
+    // newer value. A load there is caught by the load-use stall instead.
+    if (reg != 0 && ex_mem_reg_.pc != INVALID_PC && ex_mem_reg_.reg_write &&
+        !ex_mem_reg_.mem_read && ex_mem_reg_.rd == reg && result_is_gpr(ex_mem_reg_.instruction))
+    {
+        return ex_mem_reg_.alu_result;
+    }
+    return registers_.ReadGpr(reg);
 }
 
 void RV5StageVM_Base::pipeline_writeback_float()
