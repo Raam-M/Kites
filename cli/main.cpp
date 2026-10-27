@@ -8,6 +8,7 @@
 #include "common/globals.h"
 #include "processor/processor_manager.h"
 #include "processor/processor_types.h"
+#include "processor/vector/vector_config.h"
 #include "repl.h"
 #include "utils/utils.h"
 
@@ -15,6 +16,7 @@
 #include <QObject>
 #include <QString>
 
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -27,6 +29,7 @@ void printUsage(const char *programName)
     std::cerr
         << "Usage: " << programName
         << " [assembly-file] [--vm <name>] [--mem-dump <hex_addr> <row_count>]... [--repl|-i]\n"
+        << "       [--vlen <bits>] [--vector-agnostic <undisturbed|ones>] [--vector-ext <list>]\n"
         << "  assembly-file   optional; if given without --repl, assembles, runs to\n"
         << "                  completion, and dumps state (batch mode)\n"
         << "  --vm <name>     rvss (default) | rv5-nh-nf | rv5-h-nf | rv5-nh-f | rv5-h-f\n"
@@ -34,7 +37,13 @@ void printUsage(const char *programName)
            "repeatable (batch mode only)\n"
         << "  --repl, -i      drop into the interactive REPL instead of auto-running;\n"
         << "                  if assembly-file is given it is loaded before the prompt\n"
-        << "  (running with no assembly-file also enters the REPL)\n";
+        << "  (running with no assembly-file also enters the REPL)\n"
+        << "  --vlen          vector register length: 128 (default), 256, 512 or 1024\n"
+        << "  --vector-agnostic\n"
+        << "                  agnostic tail/inactive elements: undisturbed (default) or ones\n"
+        << "  --vector-ext    comma-separated vector profile and extensions, e.g.\n"
+        << "                  'v,zvfh,zvbb,zvbc' or 'zve32x'; profiles: v (default), zve64d,\n"
+        << "                  zve64f, zve64x, zve32f, zve32x; extensions: zvfh, zvbb, zvkb, zvbc\n";
 }
 
 const std::unordered_map<std::string, Kites::ProcessorType> processorTypes = {
@@ -84,6 +93,49 @@ int main(int argc, char *argv[])
         else if (arg == "--repl" || arg == "-i")
         {
             replRequested = true;
+        }
+        else if (arg == "--vlen" || arg == "--vector-agnostic" || arg == "--vector-ext")
+        {
+            if (i + 1 >= argc)
+            {
+                std::cerr << "Error: " << arg << " requires a value.\n";
+                printUsage(argv[0]);
+                return 1;
+            }
+            const std::string value = argv[++i];
+            Kites::rvv::VectorConfig &vector = Kites::rvv::config();
+            std::string error;
+            if (arg == "--vlen")
+            {
+                unsigned vlen = 0;
+                try
+                {
+                    vlen = static_cast<unsigned>(std::stoul(value));
+                }
+                catch (const std::exception &)
+                {
+                }
+                if (Kites::rvv::isSupportedVlen(vlen))
+                    vector.vlen = vlen;
+                else
+                    error = "--vlen must be 128, 256, 512 or 1024";
+            }
+            else if (arg == "--vector-agnostic")
+            {
+                if (value == "ones" || value == "undisturbed")
+                    vector.agnosticFillOnes = value == "ones";
+                else
+                    error = "--vector-agnostic must be 'undisturbed' or 'ones'";
+            }
+            else
+            {
+                error = Kites::rvv::applyExtensionList(vector, value);
+            }
+            if (!error.empty())
+            {
+                std::cerr << "Error: " << error << ".\n";
+                return 1;
+            }
         }
         else if (!arg.empty() && arg[0] == '-')
         {
@@ -177,6 +229,8 @@ int main(int argc, char *argv[])
     }
 
     Kites::DumpRegisters(Kites::globals::registers_dump_file_path, *manager.getRegisterFile());
+    const auto vectorStatsPath = Kites::globals::vm_state_directory / "vector_stats.json";
+    std::ofstream(vectorStatsPath) << manager.getVectorProfiler()->toJson();
 
     if (!memDumpArgs.empty())
     {
@@ -196,7 +250,8 @@ int main(int argc, char *argv[])
                << "Run " << (runFailed ? "failed" : "completed") << ".\n"
                << "Registers   -> " << Kites::globals::registers_dump_file_path.string() << "\n"
                << "Disassembly -> " << Kites::globals::disassembly_file_path.string() << "\n"
-               << "Errors      -> " << Kites::globals::errors_dump_file_path.string();
+               << "Errors      -> " << Kites::globals::errors_dump_file_path.string() << "\n"
+               << "Vector stats-> " << vectorStatsPath.string();
     if (!memDumpArgs.empty())
     {
         std::cout << "\nMemory      -> " << Kites::globals::memory_dump_file_path.string();
