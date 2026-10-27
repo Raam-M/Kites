@@ -1,5 +1,7 @@
 #include "custom_pseudo_manager.h"
 #include "common/globals.h"
+#include "processor/vector/vector_isa.h"
+#include "processor/vector/vtype.h"
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -9,6 +11,30 @@ namespace Kites
 {
 namespace customPseudoManager
 {
+namespace
+{
+/**
+ * Splits operands separated by commas and/or whitespace ("a, b", "a,b", "a b"). Returns false
+ * for an empty operand (consecutive, leading or trailing commas).
+ */
+bool splitOperands(const QString &text, QStringList &out)
+{
+    out.clear();
+    const QString trimmed = text.trimmed();
+    if (trimmed.isEmpty())
+        return true;
+    static const QRegularExpression separator(R"(\s*,\s*|\s+)");
+    for (const QString &piece : trimmed.split(separator, Qt::KeepEmptyParts))
+    {
+        if (piece.isEmpty())
+            return false;
+        out << piece;
+    }
+    return true;
+}
+
+} // namespace
+
 bool addCustomPseudoInstruction(const QString &pseudoInst,
                                 const QString &expansion,
                                 QString &errorMessage, bool isUpdate)
@@ -211,28 +237,11 @@ std::string expandPseudoInstruction(const std::string &source,
 
         QStringList declaredArgs;
 
-        // Accept arguments separated by spaces and/or commas (commas may
-        // optionally be present without a following space). Reject empty
-        // pieces (consecutive commas) by treating as mismatch.
-        bool badArgs = false;
-        for (int i = 1; i < tokens.size(); i++)
-        {
-            const QStringList pieces = tokens[i].split(',', Qt::KeepEmptyParts);
-            for (QString p : pieces)
-            {
-                p = p.trimmed();
-                if (p.isEmpty())
-                {
-                    badArgs = true;
-                    break;
-                }
-                declaredArgs << p;
-            }
-            if (badArgs)
-                break;
-        }
+        // Arguments are separated by commas and/or spaces; an empty argument (consecutive
+        // commas) is treated as a mismatch.
+        const bool badArgs = !splitOperands(trimmedLine.mid(instName.size()), declaredArgs);
 
-        if (declaredArgs.size() != argsArray.size())
+        if (badArgs || declaredArgs.size() != argsArray.size())
         {
             // argument count mismatch, treat as normal instruction
             expandedLines << line;
@@ -251,25 +260,19 @@ std::string expandPseudoInstruction(const std::string &source,
             // Split expansion line on whitespace, then accept commas between
             // operands; detect empty pieces (consecutive commas) and treat
             // as invalid expansion (skip expansion).
-            QStringList rawTokens =
-                expansionLineval.toString().split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+            const QString expansionText = expansionLineval.toString().trimmed();
+            const qsizetype firstSpace = expansionText.indexOf(QRegularExpression("\\s"));
             QStringList expansionLineTokens;
             bool badExpansion = false;
-            for (const QString &rt : rawTokens)
+            if (firstSpace < 0)
             {
-                const QStringList subs = rt.split(',', Qt::KeepEmptyParts);
-                for (QString s : subs)
-                {
-                    s = s.trimmed();
-                    if (s.isEmpty())
-                    {
-                        badExpansion = true;
-                        break;
-                    }
-                    expansionLineTokens << s;
-                }
-                if (badExpansion)
-                    break;
+                expansionLineTokens << expansionText;
+            }
+            else
+            {
+                QStringList operands;
+                badExpansion = !splitOperands(expansionText.mid(firstSpace), operands);
+                expansionLineTokens << expansionText.left(firstSpace) << operands;
             }
             if (badExpansion)
             {
@@ -279,11 +282,18 @@ std::string expandPseudoInstruction(const std::string &source,
                 break;
             }
 
+            static const QRegularExpression memoryOperand(R"(^(.*)\((\w+)\)$)");
             for (QString &token : expansionLineTokens)
             {
                 if (argMapping.contains(token))
                 {
                     token = argMapping[token];
+                }
+                else if (const auto m = memoryOperand.match(token);
+                         m.hasMatch() && argMapping.contains(m.captured(2)))
+                {
+                    // memory operand such as (r1) in a vector load or store
+                    token = m.captured(1) + "(" + argMapping[m.captured(2)] + ")";
                 }
             }
 
@@ -303,6 +313,122 @@ std::string expandPseudoInstruction(const std::string &source,
 
     return expandedLines.join('\n').toStdString();
 }
+
+namespace
+{
+/**
+ * Vector instruction in an expansion: every operand is checked against the instruction's
+ * operand list from the vector ISA table. Register operands may be a declared argument
+ * (r1..r32) or a register of the right kind (vN, xN, fN); a memory operand is "(arg)" or
+ * "(xN)"; immediates must be in range; vsetvli/vsetivli take vtype fields; "v0.t" is optional
+ * where the instruction can be masked. Standard vector pseudo-instructions (vneg.v, ...) are
+ * checked only for operand kinds.
+ */
+bool isValidVectorExpansionLine(const QStringList &parts, const QStringList &declaredArgs,
+                                QString &errorMessage)
+{
+    static const QRegularExpression vectorRegister(R"(^v([0-9]|[1-2][0-9]|3[0-1])$)");
+    static const QRegularExpression intRegister(R"(^x([0-9]|[1-2][0-9]|3[0-1])$)");
+    static const QRegularExpression floatRegister(R"(^f([0-9]|[1-2][0-9]|3[0-1])$)");
+    static const QRegularExpression memory(R"(^(0)?\((\w+)\)$)");
+
+    const QString opcode = parts.first().toLower();
+    const QStringList ops = parts.mid(1);
+    auto isArg = [&](const QString &s) { return declaredArgs.contains(s); };
+    auto isInteger = [](const QString &s)
+    {
+        bool ok = false;
+        s.toLongLong(&ok, 0);
+        return ok;
+    };
+    auto fail = [&](const QString &why)
+    {
+        errorMessage = QString("Invalid operands for \"%1\": %2").arg(opcode, why);
+        return false;
+    };
+
+    const rvv::InsnInfo *info = rvv::findByMnemonic(opcode.toStdString());
+    if (info == nullptr) // standard vector pseudo-instruction
+    {
+        for (const QString &op : ops)
+        {
+            if (!(isArg(op) || vectorRegister.match(op).hasMatch() ||
+                  intRegister.match(op).hasMatch() || floatRegister.match(op).hasMatch() ||
+                  op == "v0.t" || isInteger(op)))
+                return fail(QString("\"%1\" is not a declared arg, register or integer").arg(op));
+        }
+        return true;
+    }
+
+    qsizetype k = 0;
+    for (const rvv::Operand &operand : info->operands)
+    {
+        if (operand.kind == rvv::OperandKind::OptionalMask)
+        {
+            if (k < ops.size() && ops[k] == "v0.t")
+                ++k;
+            continue;
+        }
+        if (k >= ops.size())
+            return fail(QString("expected %1")
+                            .arg(QString::fromStdString(rvv::expectedSyntax(*info))));
+        const QString &op = ops[k];
+        switch (operand.kind)
+        {
+        case rvv::OperandKind::VectorRegister:
+            if (!isArg(op) && !vectorRegister.match(op).hasMatch())
+                return fail(QString("\"%1\" must be a declared arg or v0..v31").arg(op));
+            break;
+        case rvv::OperandKind::IntRegister:
+            if (!isArg(op) && !intRegister.match(op).hasMatch())
+                return fail(QString("\"%1\" must be a declared arg or x0..x31").arg(op));
+            break;
+        case rvv::OperandKind::FloatRegister:
+            if (!isArg(op) && !floatRegister.match(op).hasMatch())
+                return fail(QString("\"%1\" must be a declared arg or f0..f31").arg(op));
+            break;
+        case rvv::OperandKind::Memory:
+        {
+            const auto m = memory.match(op);
+            if (!m.hasMatch() || !(isArg(m.captured(2)) || intRegister.match(m.captured(2)).hasMatch()))
+                return fail(QString("\"%1\" must be (arg) or (xN)").arg(op));
+            break;
+        }
+        case rvv::OperandKind::Immediate:
+        {
+            bool ok = false;
+            const qlonglong value = op.toLongLong(&ok, 0);
+            int64_t min = 0;
+            int64_t max = 0;
+            rvv::immediateRange(*info, operand.field, min, max);
+            if (!ok || value < min || value > max)
+                return fail(QString("\"%1\" must be an integer in [%2, %3]").arg(op).arg(min).arg(max));
+            break;
+        }
+        case rvv::OperandKind::VtypeImmediate:
+        {
+            const qsizetype first = k;
+            while (k < ops.size() && rvv::isVtypeKeyword(ops[k].toStdString()))
+                ++k;
+            if (k == first)
+                return fail(QString("\"%1\" is not a vtype field (e32, m1, ta, ma, ...)").arg(op));
+            continue; // k already advanced
+        }
+        case rvv::OperandKind::MaskV0:
+            if (op != "v0")
+                return fail("the selector/carry operand must be v0");
+            break;
+        default:
+            break;
+        }
+        ++k;
+    }
+    if (k != ops.size())
+        return fail(QString("too many operands; expected %1")
+                        .arg(QString::fromStdString(rvv::expectedSyntax(*info))));
+    return true;
+}
+} // namespace
 
 bool isValidExpainsionLine(const QString &line,
                                                 const QStringList &declaredArgs,
@@ -503,25 +629,24 @@ bool isValidExpainsionLine(const QString &line,
 
     // const auto opcodeTable = getOpcodeTable();
 
-    QStringList parts = line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
-    // Accept commas in expansion lines (e.g., "sw r1, x2, 0") but reject
-    // consecutive commas which would produce empty operands.
-    QStringList normalizedParts;
-    for (const QString &part : parts)
+    // Operands may be separated by commas and/or spaces (e.g. "sw r1, x2, 0"); consecutive
+    // commas, which would produce an empty operand, are rejected.
+    const QString text = line.trimmed();
+    const qsizetype firstSpace = text.indexOf(QRegularExpression("\\s"));
+    QStringList normalizedParts{firstSpace < 0 ? text : text.left(firstSpace)};
+    QStringList operands;
+    if (firstSpace >= 0 && !splitOperands(text.mid(firstSpace), operands))
     {
-        const QStringList subs = part.split(',', Qt::KeepEmptyParts);
-        for (QString s : subs)
-        {
-            s = s.trimmed();
-            if (s.isEmpty())
-            {
-                errorMessage = "Invalid expansion: empty operand (consecutive commas?)";
-                return false;
-            }
-            normalizedParts << s;
-        }
+        errorMessage = "Invalid expansion: empty operand (consecutive commas?)";
+        return false;
     }
+    normalizedParts << operands;
     const QString opcode = normalizedParts.first().toLower();
+
+    if (rvv::isVectorMnemonic(opcode.toStdString()) || rvv::isVectorPseudo(opcode.toStdString()))
+    {
+        return isValidVectorExpansionLine(normalizedParts, declaredArgs, errorMessage);
+    }
 
     if (instruction_to_operand_count.count(opcode) == 0)
     {
